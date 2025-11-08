@@ -7,8 +7,14 @@ const fastingDescriptionEl = document.getElementById("fasting-description");
 const fastingSourceEl = document.getElementById("fasting-source");
 const readingsListEl = document.getElementById("readings-list");
 const saintsListEl = document.getElementById("saints-list");
+const calendarMonthEl = document.getElementById("calendar-month");
+const calendarBodyEl = document.getElementById("calendar-body");
+const calendarPrevButton = document.getElementById("calendar-prev");
+const calendarNextButton = document.getElementById("calendar-next");
 
 const today = new Date();
+let currentMonthDate = new Date(today.getFullYear(), today.getMonth(), 1);
+let selectedDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
 function pad(num) {
   return num.toString().padStart(2, "0");
@@ -18,13 +24,139 @@ function toKey(date) {
   return `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+function formatInputDate(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function isSameDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
 function setInitialDate() {
-  const formattedToday = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(
-    today.getDate()
-  )}`;
-  datePicker.value = formattedToday;
+  datePicker.value = formatInputDate(today);
   const initialKey = toKey(today);
   renderDay(initialKey);
+  renderCalendar(currentMonthDate);
+}
+
+function selectDate(date) {
+  selectedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  datePicker.value = formatInputDate(selectedDate);
+  renderDay(toKey(selectedDate));
+
+  if (
+    selectedDate.getFullYear() !== currentMonthDate.getFullYear() ||
+    selectedDate.getMonth() !== currentMonthDate.getMonth()
+  ) {
+    currentMonthDate = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      1
+    );
+  }
+
+  renderCalendar(currentMonthDate);
+}
+
+function renderCalendar(baseDate) {
+  if (!calendarBodyEl || !calendarMonthEl) {
+    return;
+  }
+
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth();
+  calendarMonthEl.textContent = baseDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  calendarBodyEl.innerHTML = "";
+
+  const firstDayOfMonth = new Date(year, month, 1);
+  const startingWeekday = firstDayOfMonth.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  let currentDay = 1;
+  let nextMonthDay = 1;
+
+  for (let week = 0; week < 6; week += 1) {
+    const row = document.createElement("tr");
+
+    for (let weekday = 0; weekday < 7; weekday += 1) {
+      const cell = document.createElement("td");
+
+      if (week === 0 && weekday < startingWeekday) {
+        cell.textContent = (daysInPrevMonth - startingWeekday + weekday + 1).toString();
+        cell.classList.add("disabled");
+        cell.setAttribute("aria-disabled", "true");
+        cell.tabIndex = -1;
+        cell.setAttribute("role", "presentation");
+      } else if (currentDay > daysInMonth) {
+        cell.textContent = (nextMonthDay++).toString();
+        cell.classList.add("disabled");
+        cell.setAttribute("aria-disabled", "true");
+        cell.tabIndex = -1;
+        cell.setAttribute("role", "presentation");
+      } else {
+        const cellDate = new Date(year, month, currentDay);
+        cell.textContent = currentDay.toString();
+
+        if (isSameDay(cellDate, today)) {
+          cell.classList.add("today");
+        }
+
+        if (selectedDate && isSameDay(cellDate, selectedDate)) {
+          cell.classList.add("selected");
+          cell.setAttribute("aria-current", "date");
+        }
+
+        if (!selectedDate || !isSameDay(cellDate, selectedDate)) {
+          cell.removeAttribute("aria-current");
+        }
+
+        const key = toKey(cellDate);
+        if (ORTHODOX_CALENDAR[key]) {
+          cell.classList.add("has-data");
+          cell.setAttribute(
+            "aria-label",
+            `${cellDate.toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+            })}: Liturgical texts available`
+          );
+        } else {
+          cell.setAttribute(
+            "aria-label",
+            cellDate.toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+            })
+          );
+        }
+
+        cell.tabIndex = 0;
+        cell.setAttribute("role", "button");
+        cell.addEventListener("click", () => selectDate(cellDate));
+        cell.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            selectDate(cellDate);
+          }
+        });
+
+        currentDay += 1;
+      }
+
+      row.appendChild(cell);
+    }
+
+    calendarBodyEl.appendChild(row);
+  }
 }
 
 function renderDay(key) {
@@ -225,12 +357,31 @@ function renderSaints(saints) {
 }
 
 datePicker.addEventListener("change", (event) => {
-  const selectedDate = new Date(event.target.value);
-  if (Number.isNaN(selectedDate.getTime())) {
+  const nextDate = new Date(event.target.value);
+  if (Number.isNaN(nextDate.getTime())) {
     return;
   }
-  const key = toKey(selectedDate);
-  renderDay(key);
+  selectDate(nextDate);
 });
+
+if (calendarPrevButton && calendarNextButton) {
+  calendarPrevButton.addEventListener("click", () => {
+    currentMonthDate = new Date(
+      currentMonthDate.getFullYear(),
+      currentMonthDate.getMonth() - 1,
+      1
+    );
+    renderCalendar(currentMonthDate);
+  });
+
+  calendarNextButton.addEventListener("click", () => {
+    currentMonthDate = new Date(
+      currentMonthDate.getFullYear(),
+      currentMonthDate.getMonth() + 1,
+      1
+    );
+    renderCalendar(currentMonthDate);
+  });
+}
 
 setInitialDate();

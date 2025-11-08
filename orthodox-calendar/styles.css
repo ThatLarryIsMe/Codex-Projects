@@ -28,11 +28,10 @@ body {
 }
 
 .site-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 340px);
+  gap: 2rem;
+  align-items: start;
   padding: 1.5rem 1.75rem;
   background: rgba(255, 255, 255, 0.8);
   border-radius: 20px;
@@ -63,6 +62,11 @@ body {
   color: var(--muted-blue);
 }
 
+.controls {
+  display: grid;
+  gap: 1rem;
+}
+
 .date-selector {
   display: flex;
   flex-direction: column;
@@ -84,6 +88,155 @@ body {
   font-family: inherit;
   color: var(--ink);
   box-shadow: 0 6px 16px rgba(32, 24, 14, 0.1);
+}
+
+.month-switcher {
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  box-shadow: 0 12px 22px var(--shadow);
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.month-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.month-header h2 {
+  font-size: 1.1rem;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.month-header button {
+  background: var(--muted-blue);
+  color: #fff;
+  border: none;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.month-header button:hover,
+.month-header button:focus {
+  outline: none;
+  transform: translateY(-1px);
+  background: var(--warm-gold);
+}
+
+.month-header button:focus-visible {
+  outline: 2px solid var(--warm-gold);
+  outline-offset: 3px;
+}
+
+.month-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.month-grid th {
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-blue);
+}
+
+.month-grid td {
+  width: calc(100% / 7);
+  text-align: center;
+  padding: 0.55rem 0;
+  border-radius: 12px;
+  background: rgba(91, 58, 41, 0.08);
+  color: var(--ink);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.month-grid td.disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+.month-grid td:hover:not(.disabled),
+.month-grid td:focus-visible:not(.disabled) {
+  transform: translateY(-1px);
+  background: rgba(192, 137, 47, 0.25);
+}
+
+.month-grid td.selected {
+  background: var(--warm-gold);
+  color: #fff;
+  font-weight: 700;
+}
+
+.month-grid td.today {
+  box-shadow: 0 0 0 2px rgba(192, 137, 47, 0.5);
+}
+
+.month-grid td.has-data::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--deep-clay);
+  position: absolute;
+  bottom: 0.4rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.month-grid td.selected.has-data::after {
+  background: #fff;
+}
+
+.calendar-legend {
+  margin: 0.75rem 0 0;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: var(--muted-blue);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(91, 58, 41, 0.12);
+}
+
+.legend-today::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--warm-gold);
+  display: inline-block;
+}
+
+.legend-data::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--deep-clay);
+  display: inline-block;
 }
 
 .hero {
@@ -301,6 +454,7 @@ h2 {
   }
 
   .site-header {
+    grid-template-columns: 1fr;
     padding: 1.2rem;
   }
 
@@ -311,6 +465,10 @@ h2 {
 
   .date-selector {
     width: 100%;
+  }
+
+  .month-switcher {
+    padding: 0.9rem 1rem 1.1rem;
   }
 
   section {
@@ -330,11 +488,6 @@ h2 {
 }
 
 @media (max-width: 480px) {
-  .site-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .hero {
     padding: 1.6rem 1.2rem;
   }
@@ -348,5 +501,32 @@ h2 {
     width: 56px;
     height: 56px;
     font-size: 1.8rem;
+  }
+
+  .controls {
+    gap: 0.75rem;
+  }
+
+  .month-header h2 {
+    font-size: 0.95rem;
+  }
+
+  .month-header button {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.1rem;
+  }
+
+  .month-grid th {
+    font-size: 0.65rem;
+  }
+
+  .month-grid td {
+    padding: 0.45rem 0;
+  }
+
+  .calendar-legend {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
