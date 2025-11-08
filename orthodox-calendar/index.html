@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Russian Orthodox Daily Companion</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Raleway:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="page-wrapper">
+      <header class="site-header">
+        <div class="logo">
+          <svg
+            width="52"
+            height="80"
+            viewBox="0 0 52 80"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path
+              d="M25.6 2C25.6 2 25.6 32 25.6 49.2C18.4 49.2 10.6 49.2 3.4 49.2C3.4 51.6 3.4 55.4 3.4 55.4C10.6 55.4 18.4 55.4 25.6 55.4C25.6 63.6 25.6 76.8 25.6 78H31.8C31.8 76.8 31.8 63.6 31.8 55.4C39 55.4 46.8 55.4 54 55.4C54 55.4 54 51.6 54 49.2C46.8 49.2 39 49.2 31.8 49.2C31.8 32 31.8 2 31.8 2H25.6Z"
+              fill="#C0892F"
+            />
+            <path
+              d="M9.8 30.6H47.6V36.8H9.8V30.6Z"
+              fill="#C0892F"
+            />
+            <path
+              d="M42.4 16.4H15V22.6H42.4V16.4Z"
+              fill="#C0892F"
+            />
+          </svg>
+          <div class="logo-text">
+            <p class="logo-title">Russian Orthodox Daily Companion</p>
+            <p class="logo-subtitle">Authentic texts for prayerful living</p>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="date-selector">
+            <label for="date-picker">Select a day</label>
+            <input type="date" id="date-picker" />
+          </div>
+          <section class="month-switcher" aria-label="Liturgical calendar">
+            <div class="month-header">
+              <button id="calendar-prev" type="button" aria-label="Previous month">&#8592;</button>
+              <h2 id="calendar-month" aria-live="polite"></h2>
+              <button id="calendar-next" type="button" aria-label="Next month">&#8594;</button>
+            </div>
+            <table class="month-grid">
+              <thead>
+                <tr>
+                  <th scope="col">Sun</th>
+                  <th scope="col">Mon</th>
+                  <th scope="col">Tue</th>
+                  <th scope="col">Wed</th>
+                  <th scope="col">Thu</th>
+                  <th scope="col">Fri</th>
+                  <th scope="col">Sat</th>
+                </tr>
+              </thead>
+              <tbody id="calendar-body"></tbody>
+            </table>
+            <p class="calendar-legend" aria-live="polite">
+              <span class="legend-item legend-today">Today</span>
+              <span class="legend-item legend-data">Authentic texts available</span>
+            </p>
+          </section>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero" aria-live="polite">
+          <h1 id="liturgical-day">Holy Glorious Leaders of the Apostles Peter and Paul</h1>
+          <p id="liturgical-note">Fourth Friday after Pentecost • Tone 3</p>
+        </section>
+
+        <section class="fasting" aria-labelledby="fasting-title">
+          <div class="section-heading">
+            <h2 id="fasting-title">Fasting Guidance</h2>
+            <span id="fasting-type" class="fasting-type">Fast Free</span>
+          </div>
+          <div class="fasting-content">
+            <div class="fasting-icon" id="fasting-icon" aria-hidden="true">🍷</div>
+            <div>
+              <p id="fasting-description">
+                Festal meal in honor of the Apostles. No fasting is prescribed.
+              </p>
+              <p id="fasting-source" class="source"></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="readings" aria-labelledby="readings-title">
+          <h2 id="readings-title">Scripture Readings</h2>
+          <div id="readings-list" class="card-grid"></div>
+        </section>
+
+        <section class="saints" aria-labelledby="saints-title">
+          <h2 id="saints-title">Saints Commemorated</h2>
+          <div id="saints-list" class="saints-grid"></div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>
+          Liturgical data curated from official Russian Orthodox sources. Scripture
+          quotations follow the Orthodox Study Bible (NKJV tradition).
+        </p>
+      </footer>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
