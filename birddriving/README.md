@@ -5,7 +5,7 @@ A road-trip bird hunt for the whole car. The map follows you as you drive and sh
 ## Features
 
 - **Live map**: follows your GPS position, draws your route, and pins every bird you spot.
-- **Local bird lists**: species seen within about 25 miles, from recent research-grade iNaturalist sightings. With no signal, it falls back to a built-in field guide of 48 roadside birds covering North American regions.
+- **Local bird lists, anywhere on Earth**: species reported on iNaturalist near you this season (current month ± 1). Empty rural areas search wider (25 → 60 → 125 miles, then all-year), and thin lists get topped up from the field guide. The app downloads the areas ahead of the car so dead zones are covered. With no signal it uses a built-in guide of 48 roadside birds, then switches to live data when signal returns.
 - **New-area reveals**: the map is split into roughly 35-mile areas. Entering a new one shows its name and three birds to look for, with a chirp.
 - **Bird songs**: a "Hear its call" button plays a Creative Commons recording from iNaturalist.
 - **Trip card**: the Journal makes a shareable 1080×1350 image with your route, stats, best find and crew podium.

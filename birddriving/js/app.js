@@ -1,5 +1,5 @@
 import { BIRDS, RARITY, SIZE_LABELS, GROUP_LABELS, REGION_NAMES } from "./birds.js";
-import { cellFor, areaName, areaBirds, wikiSummary, birdSound } from "./sources.js";
+import { cellFor, areaName, areaBirds, wikiSummary, birdSound, prefetchArea, seasonLabel } from "./sources.js";
 import { makeShareCard } from "./share.js";
 import { store, addCrew, removeCrew, crewById, standings, AVATARS } from "./store.js";
 import { sketchDataUri } from "./sketch.js";
@@ -228,6 +228,7 @@ async function enterArea(cell) {
 
   const [name, data] = await Promise.all([areaName(cell), areaBirds(cell)]);
   if (view.cell.id !== cell.id) return; // drove on while loading
+  view.meta = data;
 
   const known = store.get().areas[cell.id];
   view.area = { id: cell.id, title: name.title, subtitle: name.subtitle, region: data.region };
@@ -246,7 +247,60 @@ async function enterArea(cell) {
 
   if (!known) showReveal(prevArea);
   else if (prevArea) toast("👋", `Welcome back to ${esc(name.title)}!`);
+  prefetchAhead(cell);
 }
+
+// Download the areas the car is heading into (straight ahead, two steps out,
+// and both forward diagonals) so a dead zone at the border doesn't matter.
+let prefetchRun = 0;
+async function prefetchAhead(cell) {
+  if (!navigator.onLine) return;
+  const run = ++prefetchRun;
+  const h = (view.heading * Math.PI) / 180;
+  const dLat = Math.round(Math.cos(h));
+  const dLng = Math.round(Math.sin(h));
+  const [lat, lng] = cell.center;
+  const steps = [[dLat, dLng], [2 * dLat, 2 * dLng]];
+  // Forward diagonals: rotate the heading step 45° each way.
+  const left = [Math.round(Math.cos(h - Math.PI / 4)), Math.round(Math.sin(h - Math.PI / 4))];
+  const right = [Math.round(Math.cos(h + Math.PI / 4)), Math.round(Math.sin(h + Math.PI / 4))];
+  steps.push(left, right);
+  const seen = new Set([cell.id]);
+  for (const [a, b] of steps) {
+    const next = cellFor(lat + a * 0.5, lng + b * 0.5);
+    if (seen.has(next.id)) continue;
+    seen.add(next.id);
+    if (run !== prefetchRun || !navigator.onLine) return; // entered another area; start over from there
+    try {
+      if (await prefetchArea(next)) await new Promise((r) => setTimeout(r, 1500)); // be gentle with the API
+    } catch {
+      // Best-effort.
+    }
+  }
+}
+
+// If the current area had to use the offline guide, upgrade it to live
+// sightings as soon as signal returns.
+async function upgradeFromGuide() {
+  if (view.source !== "guide" || !view.cell || !navigator.onLine) return;
+  const cell = view.cell;
+  const data = await areaBirds(cell);
+  if (data.source !== "live" || view.cell !== cell) return;
+  const name = await areaName(cell);
+  view.meta = data;
+  view.birds = data.birds;
+  view.source = data.source;
+  view.area = { ...view.area, title: name.title, subtitle: name.subtitle };
+  store.update((st) => {
+    st.areas[cell.id] = { ...st.areas[cell.id], title: name.title, subtitle: name.subtitle, keys: data.birds.map((b) => b.key) };
+  });
+  setPill(name.title, name.subtitle || REGION_NAMES[data.region], false);
+  renderAll();
+  toast("📶", `Signal's back! Loaded the live bird list for ${esc(name.title)}.`);
+  prefetchAhead(cell);
+}
+addEventListener("online", () => setTimeout(upgradeFromGuide, 2000));
+setInterval(upgradeFromGuide, 90000);
 
 // ---------------------------------------------------------------- photos
 
@@ -476,10 +530,14 @@ function renderLook() {
     grid.innerHTML = list.map(birdCard).join("");
     hydrateImages(grid);
   }
+  const m = view.meta || {};
+  const miles = Math.round((m.radiusKm || 40) * 0.621371 / 5) * 5;
+  const when = m.seasonal && m.months ? `in ${seasonLabel(m.months)}` : "year-round";
+  const topped = view.birds.some((b) => b.fromGuide) ? " Topped up with field-guide birds for the region." : "";
   $("#sourceNote").textContent =
     view.source === "live"
-      ? `Based on recent iNaturalist sightings within 25 miles. Rarity is local: rare here means few sightings nearby.`
-      : `Showing the ${REGION_NAMES[view.area.region]} field guide. Live local sightings load when you have signal.`;
+      ? `Birds people reported within ${miles} miles ${when} on iNaturalist. Rarity is local: rare means few sightings nearby.${topped}`
+      : `No signal, so this is the ${REGION_NAMES[view.area.region]} field guide. Live local sightings load as soon as you're back online.`;
 }
 
 $("#birdGrid").addEventListener("click", (e) => {

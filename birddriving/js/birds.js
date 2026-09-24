@@ -418,7 +418,8 @@ export function regionFor(lat, lng) {
   const inNA = lat > 14 && lat < 72 && lng < -52 && lng > -170;
   if (!inNA) return "world";
   if (lat >= 50 || lng < -140) return "boreal";
-  if (lng < -117 || (lng < -114 && lat > 42)) return "pacific";
+  // West of the Cascades/Sierra, plus coastal Southern California.
+  if (lng < -120 || (lng < -117 && lat < 42)) return "pacific";
   if (lng < -103) return lat < 37 ? "southwest" : "mountain";
   if (lng < -94) return "plains";
   return lat < 36.5 ? "southeast" : "northeast";

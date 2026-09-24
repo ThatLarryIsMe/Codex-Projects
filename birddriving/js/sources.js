@@ -19,11 +19,35 @@ function cacheGet(key, ttl) {
 }
 
 function cacheSet(key, v) {
+  const value = JSON.stringify({ t: Date.now(), v });
   try {
-    localStorage.setItem(key, JSON.stringify({ t: Date.now(), v }));
+    localStorage.setItem(key, value);
   } catch {
-    // Storage full or blocked: the app still works, just without caching.
+    // Storage full: drop the oldest half of cached areas/descriptions and retry once.
+    try {
+      pruneCache();
+      localStorage.setItem(key, value);
+    } catch {
+      // Still no room (or storage blocked): the app works without caching.
+    }
   }
+}
+
+function pruneCache() {
+  const entries = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!/^bd:(birds|wiki|sound|name):/.test(k)) continue;
+    let t = 0;
+    try {
+      t = JSON.parse(localStorage.getItem(k)).t || 0;
+    } catch {
+      // Unreadable entry: treat as oldest.
+    }
+    entries.push([t, k]);
+  }
+  entries.sort((a, b) => a[0] - b[0]);
+  entries.slice(0, Math.ceil(entries.length / 2)).forEach(([, k]) => localStorage.removeItem(k));
 }
 
 async function fetchJson(url, timeoutMs = 9000) {
@@ -117,57 +141,123 @@ function curatedList(region) {
 
 // Birds observed near the area center (iNaturalist research-grade sightings),
 // enriched with curated roadside notes. Falls back to the curated regional list.
+const MIN_SPECIES = 12; // below this, search wider before trusting the list
+const RADII_KM = [40, 100, 200];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// This month plus its neighbors, so lists reflect who is actually around now
+// (a winter-only duck shouldn't show up in July).
+export function seasonMonths(d = new Date()) {
+  const m = d.getMonth() + 1;
+  return [((m + 10) % 12) + 1, m, (m % 12) + 1];
+}
+
+export function seasonLabel(months) {
+  return `${MONTH_NAMES[months[0] - 1]}–${MONTH_NAMES[months[2] - 1]}`;
+}
+
+async function speciesCounts(lat, lng, radius, months) {
+  const url =
+    `https://api.inaturalist.org/v1/observations/species_counts?lat=${lat}&lng=${lng}&radius=${radius}` +
+    `&iconic_taxa=Aves&quality_grade=research&captive=false&per_page=50&locale=en` +
+    (months ? `&month=${months.join(",")}` : "");
+  const d = await fetchJson(url, 12000);
+  return (d.results || []).filter((r) => r.taxon && r.taxon.rank === "species");
+}
+
+function liveBird(r, i, n) {
+  const t = r.taxon;
+  const name = t.preferred_common_name ? titleCase(t.preferred_common_name) : t.name;
+  const photo = t.default_photo?.medium_url || null;
+  const live = {
+    observations: r.count,
+    photo,
+    photoLarge: photo ? photo.replace("/medium.", "/large.") : null,
+    photoCredit: t.default_photo?.attribution || null,
+    taxonId: t.id,
+  };
+  const c = findCurated(t.name, name);
+  if (c) return fromCurated(c, { ...live, rarity: rarityFromRank(i, n) });
+  return {
+    key: t.name.toLowerCase(),
+    id: `inat-${t.id}`,
+    name,
+    sci: t.name,
+    wiki: wikiTitleFromUrl(t.wikipedia_url) || t.name.replace(/ /g, "_"),
+    rarity: rarityFromRank(i, n),
+    size: null,
+    group: guessGroup(name),
+    carSpot: /hawk|vulture|eagle|heron|egret|crow|raven|blackbird|swallow|goose|crane|kestrel|magpie|meadowlark|pelican|gull/i.test(name),
+    lookFor: null,
+    kidFact: null,
+    about: null,
+    colors: null,
+    curated: false,
+    ...live,
+  };
+}
+
+// Birds reported near the area center this season on iNaturalist (research-
+// grade, wild), enriched with curated roadside notes. Works anywhere on Earth
+// with signal. Sparse areas search wider; thin lists are topped up from the
+// regional field guide; with no signal it falls back to the guide entirely.
 export async function areaBirds(cell) {
-  const key = `bd:birds:v2:${cell.id}`;
+  const months = seasonMonths();
+  const key = `bd:birds:v3:${cell.id}:${months[1]}`;
   const cached = cacheGet(key, TTL_AREA);
   if (cached) return cached;
   const [lat, lng] = cell.center;
   const region = regionFor(lat, lng);
+
+  let results = [];
+  let radiusKm = RADII_KM[0];
+  let seasonal = true;
   try {
-    const url =
-      `https://api.inaturalist.org/v1/observations/species_counts?lat=${lat}&lng=${lng}&radius=40` +
-      `&iconic_taxa=Aves&quality_grade=research&captive=false&per_page=40&locale=en`;
-    const d = await fetchJson(url, 12000);
-    const results = (d.results || []).filter((r) => r.taxon && r.taxon.rank === "species");
-    if (results.length < 6) throw new Error("too few results");
-    const n = results.length;
-    const birds = results.map((r, i) => {
-      const t = r.taxon;
-      const name = t.preferred_common_name ? titleCase(t.preferred_common_name) : t.name;
-      const photo = t.default_photo?.medium_url || null;
-      const live = {
-        observations: r.count,
-        photo,
-        photoLarge: photo ? photo.replace("/medium.", "/large.") : null,
-        photoCredit: t.default_photo?.attribution || null,
-        taxonId: t.id,
-      };
-      const c = findCurated(t.name, name);
-      if (c) return fromCurated(c, { ...live, rarity: rarityFromRank(i, n) });
-      return {
-        key: t.name.toLowerCase(),
-        id: `inat-${t.id}`,
-        name,
-        sci: t.name,
-        wiki: wikiTitleFromUrl(t.wikipedia_url) || t.name.replace(/ /g, "_"),
-        rarity: rarityFromRank(i, n),
-        size: null,
-        group: guessGroup(name),
-        carSpot: /hawk|vulture|eagle|heron|egret|crow|raven|blackbird|swallow|goose|crane|kestrel|magpie|meadowlark|pelican|gull/i.test(name),
-        lookFor: null,
-        kidFact: null,
-        about: null,
-        colors: null,
-        curated: false,
-        ...live,
-      };
-    });
-    const out = { source: "live", region, birds };
-    cacheSet(key, out);
-    return out;
+    for (const r of RADII_KM) {
+      const got = await speciesCounts(lat, lng, r, months);
+      if (got.length >= results.length) {
+        results = got;
+        radiusKm = r;
+      }
+      if (results.length >= MIN_SPECIES) break;
+    }
+    if (results.length < MIN_SPECIES) {
+      // Very remote or little-birded: use all-year sightings rather than a thin list.
+      const all = await speciesCounts(lat, lng, RADII_KM[RADII_KM.length - 1], null);
+      if (all.length > results.length) {
+        results = all;
+        radiusKm = RADII_KM[RADII_KM.length - 1];
+        seasonal = false;
+      }
+    }
   } catch {
-    return { source: "guide", region, birds: curatedList(region) };
+    // Keep whatever a smaller radius already returned; otherwise fall back below.
   }
+  if (!results.length) return { source: "guide", region, birds: curatedList(region) };
+
+  const birds = results.map((r, i) => liveBird(r, i, results.length));
+  if (birds.length < 20) {
+    const have = new Set(birds.map((b) => b.key));
+    for (const b of curatedList(region)) {
+      if (!have.has(b.key)) birds.push({ ...b, fromGuide: true });
+    }
+  }
+  const out = { source: "live", region, birds, radiusKm, seasonal, months };
+  cacheSet(key, out);
+  return out;
+}
+
+// Warm the cache for an area the car is heading toward, including its photos,
+// so it still works if signal drops by the time you get there.
+export async function prefetchArea(cell) {
+  const months = seasonMonths();
+  if (cacheGet(`bd:birds:v3:${cell.id}:${months[1]}`, TTL_AREA)) return false;
+  const [, data] = await Promise.all([areaName(cell), areaBirds(cell)]);
+  if (data.source !== "live") return false;
+  data.birds.slice(0, 16).forEach((b) => {
+    if (b.photo) new Image().src = b.photo;
+  });
+  return true;
 }
 
 function titleCase(s) {
