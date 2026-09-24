@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>BirdDriving</title>
+    <meta name="description" content="A road-trip bird hunt: see which birds live where you're driving, spot them, and race your crew to the top of the leaderboard." />
+    <meta name="theme-color" content="#0f3b3a" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,800&family=Nunito:wght@400;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="map" aria-label="Map of your trip"></div>
+
+    <header class="topbar">
+      <div class="brand" aria-label="BirdDriving">
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="32" r="30" fill="#0f3b3a" />
+          <path d="M8 44 Q32 36 56 44" stroke="#ffc857" stroke-width="3" fill="none" stroke-dasharray="5 4" />
+          <path d="M16 30 C22 20 34 18 42 24 L52 20 L47 28 C45 36 36 40 26 38 C22 37 18 34 16 30Z" fill="#ff7a45" />
+          <path d="M24 29 C30 25 36 26 40 30 C34 33 28 33 24 29Z" fill="#fff4de" />
+          <circle cx="42" cy="25" r="1.8" fill="#0f3b3a" />
+        </svg>
+        <span class="brand-word">Bird<b>Driving</b></span>
+      </div>
+      <button class="area-pill" id="areaPill" type="button" aria-live="polite">
+        <span class="area-dot" aria-hidden="true"></span>
+        <span class="area-text">
+          <span class="area-title" id="areaTitle">Finding you…</span>
+          <span class="area-sub" id="areaSub">Waiting for location</span>
+        </span>
+      </button>
+      <button class="icon-btn" id="settingsBtn" type="button" aria-label="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm8.1-2.3.1-1.2-.1-1.2 2-1.6-2-3.4-2.4 1a8 8 0 0 0-2-1.2L15.3 3h-4l-.4 2.6a8 8 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6-.1 1.2.1 1.2-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2l.4 2.6h4l.4-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6Z" fill="currentColor"/></svg>
+      </button>
+    </header>
+
+    <div class="map-controls">
+      <button class="fab" id="recenterBtn" type="button" aria-label="Center map on me">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 20.3l.7.7L12 18l6.8 3 .7-.7Z" fill="currentColor"/></svg>
+      </button>
+    </div>
+
+    <div class="banner" id="locBanner" hidden>
+      <p><b>Location is off.</b> Tap the map to choose where you are, or take a demo drive.</p>
+      <div class="banner-actions">
+        <button class="btn btn-small" id="retryLocBtn" type="button">Try again</button>
+        <button class="btn btn-small btn-sun" id="bannerDemoBtn" type="button">Demo drive</button>
+      </div>
+    </div>
+
+    <div class="demo-chip" id="demoChip" hidden>
+      <span>🚗 Demo drive: LA → Utah</span>
+      <button type="button" id="stopDemoBtn">Stop</button>
+    </div>
+
+    <section class="sheet" id="sheet" data-state="half" aria-label="Bird guide">
+      <button class="sheet-handle" id="sheetHandle" type="button" aria-label="Expand or collapse the bird guide"><span></span></button>
+      <div class="sheet-head">
+        <div class="progress" id="progress">
+          <svg viewBox="0 0 44 44" aria-hidden="true">
+            <circle cx="22" cy="22" r="19" class="ring-bg" />
+            <circle cx="22" cy="22" r="19" class="ring-fg" id="ringFg" />
+          </svg>
+          <span id="progressNum">0</span>
+        </div>
+        <div class="sheet-head-text">
+          <h2 id="sheetTitle">Birds around here</h2>
+          <p id="sheetSub">Looking up who lives nearby…</p>
+        </div>
+        <button class="spotter-chip" id="spotterChip" type="button" aria-label="Change spotter"></button>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" class="tab" data-tab="look" aria-selected="true">Look for</button>
+        <button role="tab" class="tab" data-tab="bingo" aria-selected="false">Bingo</button>
+        <button role="tab" class="tab" data-tab="leaders" aria-selected="false">Leaders</button>
+        <button role="tab" class="tab" data-tab="journal" aria-selected="false">Journal</button>
+      </nav>
+      <div class="panels">
+        <div class="panel" data-panel="look" role="tabpanel">
+          <div class="filters" id="filters">
+            <button class="filter" data-filter="todo" aria-pressed="true">Still to find</button>
+            <button class="filter" data-filter="car" aria-pressed="false">🚗 Easy from the car</button>
+            <button class="filter" data-filter="raptor" aria-pressed="false">🦅 Birds of prey</button>
+            <button class="filter" data-filter="water" aria-pressed="false">🌊 Water birds</button>
+            <button class="filter" data-filter="spotted" aria-pressed="false">✓ Spotted</button>
+            <button class="filter" data-filter="all" aria-pressed="false">All</button>
+          </div>
+          <div class="bird-grid" id="birdGrid"></div>
+          <p class="source-note" id="sourceNote"></p>
+        </div>
+        <div class="panel" data-panel="bingo" role="tabpanel" hidden>
+          <div class="bingo-head">
+            <div>
+              <h3>Road Trip Bingo</h3>
+              <p>Spot a row, column or diagonal. The car in the middle is free!</p>
+            </div>
+            <button class="btn btn-small" id="newBingoBtn" type="button">New card</button>
+          </div>
+          <div class="bingo" id="bingo"></div>
+        </div>
+        <div class="panel" data-panel="leaders" role="tabpanel" hidden>
+          <div class="seg" id="boardSeg">
+            <button data-scope="area" aria-pressed="true">This area</button>
+            <button data-scope="trip" aria-pressed="false">Whole trip</button>
+          </div>
+          <h3 class="panel-h">Your car</h3>
+          <ol class="board" id="crewBoard"></ol>
+          <div class="crew-add">
+            <button class="btn btn-ghost" id="addCrewBtn" type="button">+ Add a spotter</button>
+          </div>
+          <h3 class="panel-h">Everyone on the road</h3>
+          <ol class="board" id="worldBoard"></ol>
+          <p class="source-note" id="worldNote"></p>
+        </div>
+        <div class="panel" data-panel="journal" role="tabpanel" hidden>
+          <button class="btn btn-sun share-cta" id="shareBtn" type="button">📸 Make our trip card</button>
+          <div class="stats" id="stats"></div>
+          <h3 class="panel-h">Badges</h3>
+          <div class="badges" id="badges"></div>
+          <h3 class="panel-h">Trip log</h3>
+          <div class="log" id="log"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bird detail -->
+    <dialog class="modal bird-modal" id="birdDialog" aria-labelledby="bdName">
+      <div class="bird-hero">
+        <img id="bdImg" alt="" />
+        <button class="modal-close" type="button" data-close aria-label="Close">✕</button>
+        <div class="bird-hero-text">
+          <span class="rarity" id="bdRarity"></span>
+          <h2 id="bdName"></h2>
+          <p class="sci" id="bdSci"></p>
+        </div>
+      </div>
+      <div class="bird-body">
+        <div class="chips" id="bdChips"></div>
+        <button class="sound-btn" id="bdSound" type="button" aria-pressed="false">
+          <span class="sound-ico" aria-hidden="true">🔊</span>
+          <span class="sound-txt"><b id="bdSoundLabel">Hear its call</b><small id="bdSoundSub">Listen before you look</small></span>
+          <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        </button>
+        <div class="kid-fact" id="bdKid"></div>
+        <div class="look-for" id="bdLook"></div>
+        <div class="size-row" id="bdSize"></div>
+        <p class="about" id="bdAbout"></p>
+        <div class="spotters" id="bdSpotters"></div>
+        <p class="credit" id="bdCredit"></p>
+      </div>
+      <div class="bird-actions">
+        <button class="btn btn-sun btn-big" id="bdSpotBtn" type="button"></button>
+      </div>
+    </dialog>
+
+    <!-- Who spotted it -->
+    <dialog class="modal small-modal" id="spotDialog" aria-labelledby="spotTitle">
+      <h2 id="spotTitle">Who saw it?</h2>
+      <p class="muted" id="spotSub"></p>
+      <div class="crew-pick" id="crewPick"></div>
+      <p class="safety">Drivers: eyes on the road. Let a passenger do the tapping.</p>
+      <div class="modal-row">
+        <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+        <button class="btn btn-sun" id="spotConfirm" type="button">Mark as spotted</button>
+      </div>
+    </dialog>
+
+    <!-- Add spotter -->
+    <dialog class="modal small-modal" id="crewDialog" aria-labelledby="crewTitle">
+      <h2 id="crewTitle">Add a spotter</h2>
+      <form id="crewForm">
+        <label class="field">
+          <span>Name</span>
+          <input id="crewName" maxlength="18" autocomplete="off" placeholder="Grandma, Leo, Captain Hawk…" required />
+        </label>
+        <div class="avatar-pick" id="avatarPick" role="radiogroup" aria-label="Choose an avatar"></div>
+        <div class="modal-row">
+          <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+          <button class="btn btn-sun" type="submit">Add</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Trip card -->
+    <dialog class="modal small-modal share-modal" id="shareDialog" aria-labelledby="shareTitle">
+      <h2 id="shareTitle">Your trip card</h2>
+      <p class="muted">Send it to Grandma, post it, or save it for the scrapbook.</p>
+      <div class="share-preview"><img id="sharePreview" alt="Trip card with your route, bird count and best find" /></div>
+      <div class="modal-row">
+        <button class="btn btn-ghost" id="shareSave" type="button">Save image</button>
+        <button class="btn btn-sun" id="shareSend" type="button">Share</button>
+      </div>
+      <div class="modal-row"><button class="btn btn-ghost" type="button" data-close>Close</button></div>
+    </dialog>
+
+    <!-- Settings -->
+    <dialog class="modal small-modal" id="settingsDialog" aria-labelledby="setTitle">
+      <h2 id="setTitle">Settings</h2>
+      <label class="toggle"><input type="checkbox" id="setKid" /><span><b>Kid mode</b><small>Bigger cards, fun facts first, no Latin names</small></span></label>
+      <label class="toggle"><input type="checkbox" id="setSound" /><span><b>Bird chirps</b><small>A little song when you spot a bird</small></span></label>
+      <div class="settings-actions">
+        <button class="btn btn-ghost" id="setDemo" type="button">🚗 Start demo drive</button>
+        <button class="btn btn-ghost danger" id="setReset" type="button">Start a new trip</button>
+      </div>
+      <p class="muted small">Bird sightings and song recordings from <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a>. Photos and descriptions from iNaturalist and Wikipedia contributors. Map © OpenStreetMap contributors, © CARTO.</p>
+      <div class="modal-row"><button class="btn btn-sun" type="button" data-close>Done</button></div>
+    </dialog>
+
+    <!-- New area reveal -->
+    <div class="reveal" id="reveal" hidden role="dialog" aria-modal="true" aria-labelledby="revealTitle">
+      <div class="reveal-sky" aria-hidden="true">
+        <span class="flock f1"></span><span class="flock f2"></span><span class="flock f3"></span>
+        <div class="hills"></div>
+      </div>
+      <div class="reveal-content">
+        <p class="eyebrow" id="revealEyebrow">New bird country</p>
+        <h1 id="revealTitle"></h1>
+        <p class="reveal-sub" id="revealSub"></p>
+        <div class="fan" id="revealCards"></div>
+        <div class="reveal-actions">
+          <button class="btn btn-sun btn-big" id="revealGo" type="button">Let's spot them!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Onboarding -->
+    <div class="onboard" id="onboard" hidden role="dialog" aria-modal="true" aria-labelledby="obTitle">
+      <div class="onboard-card">
+        <div class="ob-step" data-step="0">
+          <div class="ob-art" id="obArt" aria-hidden="true"></div>
+          <h1 id="obTitle">Bird<b>Driving</b></h1>
+          <p class="ob-lede">Every mile of road passes through someone's backyard: hawks on light poles, herons in the ditches, roadrunners on the shoulder. Let's find them.</p>
+          <button class="btn btn-sun btn-big" data-next type="button">Start a trip</button>
+        </div>
+        <div class="ob-step" data-step="1" hidden>
+          <h2>Who's in the car?</h2>
+          <p class="muted">Everyone gets their own score. Kids vs. grown-ups is encouraged.</p>
+          <form id="obCrewForm" class="ob-crew-form">
+            <input id="obName" maxlength="18" autocomplete="off" placeholder="Type a name" aria-label="Spotter name" />
+            <button class="btn" type="submit">Add</button>
+          </form>
+          <div class="ob-crew" id="obCrew"></div>
+          <button class="btn btn-sun btn-big" id="obCrewNext" type="button">Next</button>
+        </div>
+        <div class="ob-step" data-step="2" hidden>
+          <div class="ob-safety" aria-hidden="true">🚗👀</div>
+          <h2>Passengers spot. Drivers drive.</h2>
+          <p class="muted">BirdDriving follows your location to show which birds live along your route. Your location stays on this device.</p>
+          <button class="btn btn-sun btn-big" id="obLocate" type="button">Use my location</button>
+          <button class="btn btn-ghost btn-big" id="obDemo" type="button">Try a demo drive</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
