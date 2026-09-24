@@ -11,7 +11,7 @@ A road-trip bird hunt for the whole car. The map follows you as you drive and sh
 - **Trip card**: the Journal makes a shareable 1080×1350 image with your route, stats, best find and crew podium.
 - **Bird cards**: photos, rarity (1/3/5 points), a kid fact, a "where to look from the car" tip, a size comparison, and a description.
 - **Spotting**: choose everyone in the car who saw it. You get confetti, a birdsong chirp, and an Undo button.
-- **Leaderboards**: per area and for the whole trip. Your car always has one. Running `server.js` adds a shared board for everyone on the road.
+- **Leaderboards**: per area and for the whole trip. Your car always has one. Deployed on Vercel with Blob storage, or run with `server.js`, everyone on the road shares a board too.
 - **Road Trip Bingo**: a 3×3 card for each area with a free car square in the middle.
 - **Journal**: species, points, areas and miles, plus 10 badges and a trip log.
 - **Kid mode**: bigger cards, fun facts first, no Latin names.
