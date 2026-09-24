@@ -1,7 +1,12 @@
-// Shared leaderboards. When the app is served by server.js, sightings sync to
-// /api and every car on the road competes on the same boards. Served as plain
-// static files, the app falls back to the crew-only (this device) boards.
-const QUEUE_KEY = "bd:syncQueue";
+// Shared leaderboards. When the app is hosted with its API (Vercel functions
+// in api/, or server.js), each spotter's scores sync so every car on the road
+// competes on the same boards. As plain static files, boards stay on-device.
+//
+// Sync sends each spotter's complete species list for an area (not diffs), so
+// retries are idempotent and one car can never overwrite another car's scores.
+import { store } from "./store.js";
+
+const DIRTY_KEY = "bd:dirty";
 let online = null;
 
 export async function detectServer() {
@@ -17,36 +22,57 @@ export async function detectServer() {
 
 export const isShared = () => online === true;
 
-function readQueue() {
+function readDirty() {
   try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
+    return new Set(JSON.parse(localStorage.getItem(DIRTY_KEY) || "[]"));
   } catch {
-    return [];
+    return new Set();
   }
 }
 
-function writeQueue(q) {
+function writeDirty(set) {
   try {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(q.slice(-500)));
+    localStorage.setItem(DIRTY_KEY, JSON.stringify([...set]));
   } catch {
     // Ignore; sync is best-effort.
   }
 }
 
-export function queueSighting(op, sighting, player) {
-  const q = readQueue();
-  q.push({
-    op,
-    playerId: player.id,
-    name: player.name,
-    avatar: player.avatar,
-    area: sighting.areaId,
-    areaName: sighting.areaTitle,
-    key: sighting.key,
-    points: sighting.points,
-  });
-  writeQueue(q);
-  flush();
+let timer = null;
+// Mark a spotter's standing in an area as changed; syncs a few seconds later
+// so a burst of spots becomes one request.
+export function markDirty(playerId, areaId) {
+  const d = readDirty();
+  d.add(`${playerId}|${areaId}`);
+  writeDirty(d);
+  clearTimeout(timer);
+  timer = setTimeout(flush, 4000);
+}
+
+function recordFor(playerId, areaId, crewMember) {
+  const s = store.get();
+  const species = {};
+  let areaName = s.areas[areaId]?.title || "";
+  const tripKeys = new Map();
+  for (const x of s.sightings) {
+    if (x.playerId !== playerId) continue;
+    tripKeys.set(`${x.areaId}|${x.key}`, x.points);
+    if (x.areaId === areaId) {
+      species[x.key] = x.points;
+      areaName = areaName || x.areaTitle;
+    }
+  }
+  const tripPoints = [...tripKeys.values()].reduce((a, b) => a + b, 0);
+  const tripSpecies = new Set([...tripKeys.keys()].map((k) => k.split("|")[1])).size;
+  return {
+    playerId,
+    name: crewMember?.name || "Spotter",
+    avatar: crewMember?.avatar || "🐦",
+    area: areaId,
+    areaName,
+    species: crewMember ? species : {},
+    trip: crewMember ? { count: tripSpecies, points: tripPoints } : { count: 0, points: 0 },
+  };
 }
 
 let flushing = false;
@@ -54,20 +80,21 @@ export async function flush() {
   if (flushing || !(await detectServer())) return;
   flushing = true;
   try {
-    let q = readQueue();
-    while (q.length) {
-      const item = q[0];
-      const res = await fetch(item.op === "remove" ? "api/sightings/remove" : "api/sightings", {
+    const dirty = readDirty();
+    for (const item of [...dirty]) {
+      const [playerId, areaId] = item.split("|");
+      const member = store.get().crew.find((c) => c.id === playerId) || null;
+      const res = await fetch("api/scores", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(item),
+        body: JSON.stringify(recordFor(playerId, areaId, member)),
       });
       if (!res.ok && res.status !== 400) break; // retry later; drop malformed items
-      q = q.slice(1);
-      writeQueue(q);
+      dirty.delete(item);
+      writeDirty(dirty);
     }
   } catch {
-    // Offline: the queue waits for the next flush.
+    // Offline: dirty entries wait for the next flush.
   } finally {
     flushing = false;
   }
@@ -76,9 +103,7 @@ export async function flush() {
 export async function fetchBoard(areaId) {
   if (!(await detectServer())) return null;
   try {
-    const res = await fetch(areaId ? `api/leaderboard?area=${encodeURIComponent(areaId)}` : "api/leaderboard", {
-      cache: "no-store",
-    });
+    const res = await fetch(areaId ? `api/leaderboard?area=${encodeURIComponent(areaId)}` : "api/leaderboard");
     if (!res.ok) return null;
     return await res.json();
   } catch {

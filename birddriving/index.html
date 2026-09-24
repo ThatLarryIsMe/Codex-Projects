@@ -125,6 +125,7 @@
           <p class="source-note" id="worldNote"></p>
         </div>
         <div class="panel" data-panel="journal" role="tabpanel" hidden>
+          <button class="btn btn-sun share-cta" id="shareBtn" type="button">📸 Make our trip card</button>
           <div class="stats" id="stats"></div>
           <h3 class="panel-h">Badges</h3>
           <div class="badges" id="badges"></div>
@@ -147,6 +148,11 @@
       </div>
       <div class="bird-body">
         <div class="chips" id="bdChips"></div>
+        <button class="sound-btn" id="bdSound" type="button" aria-pressed="false">
+          <span class="sound-ico" aria-hidden="true">🔊</span>
+          <span class="sound-txt"><b id="bdSoundLabel">Hear its call</b><small id="bdSoundSub">Listen before you look</small></span>
+          <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        </button>
         <div class="kid-fact" id="bdKid"></div>
         <div class="look-for" id="bdLook"></div>
         <div class="size-row" id="bdSize"></div>
@@ -187,6 +193,18 @@
       </form>
     </dialog>
 
+    <!-- Trip card -->
+    <dialog class="modal small-modal share-modal" id="shareDialog" aria-labelledby="shareTitle">
+      <h2 id="shareTitle">Your trip card</h2>
+      <p class="muted">Send it to Grandma, post it, or save it for the scrapbook.</p>
+      <div class="share-preview"><img id="sharePreview" alt="Trip card with your route, bird count and best find" /></div>
+      <div class="modal-row">
+        <button class="btn btn-ghost" id="shareSave" type="button">Save image</button>
+        <button class="btn btn-sun" id="shareSend" type="button">Share</button>
+      </div>
+      <div class="modal-row"><button class="btn btn-ghost" type="button" data-close>Close</button></div>
+    </dialog>
+
     <!-- Settings -->
     <dialog class="modal small-modal" id="settingsDialog" aria-labelledby="setTitle">
       <h2 id="setTitle">Settings</h2>
@@ -196,7 +214,7 @@
         <button class="btn btn-ghost" id="setDemo" type="button">🚗 Start demo drive</button>
         <button class="btn btn-ghost danger" id="setReset" type="button">Start a new trip</button>
       </div>
-      <p class="muted small">Bird sightings nearby from <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a>. Photos and descriptions from iNaturalist and Wikipedia contributors. Map © OpenStreetMap contributors, © CARTO.</p>
+      <p class="muted small">Bird sightings and song recordings from <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a>. Photos and descriptions from iNaturalist and Wikipedia contributors. Map © OpenStreetMap contributors, © CARTO.</p>
       <div class="modal-row"><button class="btn btn-sun" type="button" data-close>Done</button></div>
     </dialog>
 

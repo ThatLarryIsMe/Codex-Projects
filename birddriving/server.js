@@ -1,10 +1,12 @@
 // BirdDriving server: serves the app and hosts shared area leaderboards.
 // Zero dependencies. Run with `node server.js` (PORT env var optional).
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseScore, areaRow, tripRow, rank, AREA_RE } from "./api/_lib.js";
 
-const ROOT = __dirname;
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(ROOT, "data");
 const DB_FILE = path.join(DATA_DIR, "leaderboard.json");
 const PORT = Number(process.env.PORT) || 8080;
@@ -20,10 +22,8 @@ const TYPES = {
   ".ico": "image/x-icon",
 };
 
-// db.sightings: { "<area>|<playerId>|<speciesKey>": points }
-// db.players:   { playerId: { name, avatar } }
-// db.areas:     { area: name }
-let db = { sightings: {}, players: {}, areas: {} };
+// db.area: { "<area>|<playerId>": areaRow }   db.trip: { playerId: tripRow }
+let db = { area: {}, trip: {} };
 try {
   db = { ...db, ...JSON.parse(fs.readFileSync(DB_FILE, "utf8")) };
 } catch {
@@ -41,9 +41,6 @@ function persist() {
   }, 250);
 }
 
-const clean = (s, max) => String(s ?? "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, max);
-const VALID_POINTS = new Set([1, 3, 5]);
-
 // Very small per-IP rate limit to keep a single client from flooding the board.
 const hits = new Map();
 function limited(ip) {
@@ -54,28 +51,12 @@ function limited(ip) {
   return recent.length > 120;
 }
 
-function board(area) {
-  const rows = new Map();
-  for (const [k, points] of Object.entries(db.sightings)) {
-    const [a, playerId] = k.split("|");
-    if (area && a !== area) continue;
-    const p = db.players[playerId];
-    if (!p) continue;
-    const r = rows.get(playerId) || { playerId, name: p.name, avatar: p.avatar, count: 0, points: 0 };
-    r.count += 1;
-    r.points += points;
-    rows.set(playerId, r);
-  }
-  const entries = [...rows.values()].sort((a, b) => b.points - a.points || b.count - a.count).slice(0, 50);
-  return { area: area || null, areaName: area ? db.areas[area] || null : null, entries };
-}
-
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (c) => {
       body += c;
-      if (body.length > 4096) {
+      if (body.length > 32768) {
         reject(new Error("too large"));
         req.destroy();
       }
@@ -98,30 +79,28 @@ function send(res, status, obj) {
 async function api(req, res, url) {
   if (url.pathname === "/api/health") return send(res, 200, { ok: true });
   if (url.pathname === "/api/leaderboard" && req.method === "GET") {
-    return send(res, 200, board(clean(url.searchParams.get("area"), 40) || null));
+    const area = url.searchParams.get("area");
+    if (area && !AREA_RE.test(area)) return send(res, 400, { error: "invalid area" });
+    const rows = area
+      ? Object.entries(db.area).filter(([k]) => k.startsWith(area + "|")).map(([, v]) => v)
+      : Object.values(db.trip);
+    return send(res, 200, { area: area || null, entries: rank(rows) });
   }
-  if ((url.pathname === "/api/sightings" || url.pathname === "/api/sightings/remove") && req.method === "POST") {
+  if (url.pathname === "/api/scores" && req.method === "POST") {
     if (limited(req.socket.remoteAddress)) return send(res, 429, { error: "slow down" });
-    let b;
+    let rec;
     try {
-      b = await readBody(req);
+      rec = parseScore(await readBody(req));
     } catch {
       return send(res, 400, { error: "bad body" });
     }
-    const playerId = clean(b.playerId, 64);
-    const area = clean(b.area, 40);
-    const key = clean(b.key, 80).toLowerCase();
-    const points = Number(b.points);
-    if (!playerId || !/^-?\d+_-?\d+$/.test(area) || !key) return send(res, 400, { error: "invalid" });
-    const id = `${area}|${playerId}|${key}`;
-    if (url.pathname.endsWith("/remove")) {
-      delete db.sightings[id];
-    } else {
-      if (!VALID_POINTS.has(points)) return send(res, 400, { error: "invalid points" });
-      db.players[playerId] = { name: clean(b.name, 18) || "Spotter", avatar: clean(b.avatar, 8) || "🐦" };
-      if (b.areaName) db.areas[area] = clean(b.areaName, 60);
-      db.sightings[id] = points;
-    }
+    if (!rec) return send(res, 400, { error: "invalid" });
+    const row = areaRow(rec);
+    const k = `${rec.area}|${rec.playerId}`;
+    if (row.count) db.area[k] = row;
+    else delete db.area[k];
+    if (rec.trip.count) db.trip[rec.playerId] = tripRow(rec);
+    else delete db.trip[rec.playerId];
     persist();
     return send(res, 200, { ok: true });
   }
@@ -132,7 +111,8 @@ function serveStatic(req, res, url) {
   let rel = decodeURIComponent(url.pathname);
   if (rel.endsWith("/")) rel += "index.html";
   const file = path.normalize(path.join(ROOT, rel));
-  if (!file.startsWith(ROOT) || file.startsWith(DATA_DIR) || path.basename(file) === "server.js") {
+  const blocked = file.startsWith(DATA_DIR) || file.startsWith(path.join(ROOT, "api")) || file.startsWith(path.join(ROOT, "node_modules"));
+  if (!file.startsWith(ROOT + path.sep) || blocked || path.basename(file) === "server.js") {
     res.writeHead(403);
     return res.end();
   }

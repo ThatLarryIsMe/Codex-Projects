@@ -1,6 +1,6 @@
 // Offline support for dead zones: the app shell is cached up front; map tiles
 // and bird photos are cached as you drive so they still show without signal.
-const SHELL = "bd-shell-v1";
+const SHELL = "bd-shell-v2";
 const MEDIA = "bd-media-v1";
 const MEDIA_LIMIT = 800;
 
@@ -17,6 +17,7 @@ const SHELL_FILES = [
   "js/sketch.js",
   "js/fx.js",
   "js/leaderboard.js",
+  "js/share.js",
   "vendor/leaflet/leaflet.js",
   "vendor/leaflet/leaflet.css",
 ];
@@ -59,6 +60,9 @@ self.addEventListener("fetch", (e) => {
     );
     return;
   }
+
+  // Audio uses range requests (206), which the Cache API can't store.
+  if (req.destination === "audio" || req.headers.has("range")) return;
 
   const isMedia =
     req.destination === "image" ||

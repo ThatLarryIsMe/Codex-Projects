@@ -1,9 +1,10 @@
 import { BIRDS, RARITY, SIZE_LABELS, GROUP_LABELS, REGION_NAMES } from "./birds.js";
-import { cellFor, areaName, areaBirds, wikiSummary } from "./sources.js";
+import { cellFor, areaName, areaBirds, wikiSummary, birdSound } from "./sources.js";
+import { makeShareCard } from "./share.js";
 import { store, addCrew, removeCrew, crewById, standings, AVATARS } from "./store.js";
 import { sketchDataUri } from "./sketch.js";
 import { chirp, confetti, vibrate } from "./fx.js";
-import { detectServer, isShared, queueSighting, fetchBoard, flush } from "./leaderboard.js";
+import { detectServer, isShared, markDirty, fetchBoard, flush } from "./leaderboard.js";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -388,11 +389,7 @@ function applySpot(b, playerIds) {
     s.sightings = s.sightings.filter((x) => !removedRecords.includes(x));
     s.sightings.push(...newRecords);
   });
-  newRecords.forEach((r) => queueSighting("add", r, crewById(r.playerId)));
-  removedRecords.forEach((r) => {
-    const p = crewById(r.playerId);
-    if (p) queueSighting("remove", r, p);
-  });
+  [...added, ...removed].forEach((playerId) => markDirty(playerId, area.id));
 
   if (added.length) {
     const who = added.map(crewById).filter(Boolean);
@@ -514,6 +511,7 @@ function firstSentence(text) {
 }
 
 function fillBird(b) {
+  if (soundFor !== b) resetSound(b);
   const r = RARITY[b.rarity];
   const g = GROUP_LABELS[b.group] || GROUP_LABELS.songbird;
   setImg($("#bdImg"), b, true);
@@ -578,6 +576,105 @@ function fillBird(b) {
 }
 
 $("#bdSpotBtn").addEventListener("click", () => view.openBird && openSpot(view.openBird));
+
+// ---------------------------------------------------------------- bird songs
+
+const player = new Audio();
+player.preload = "none";
+let soundFor = null;
+
+function soundUi(label, sub, { playing = false, disabled = false } = {}) {
+  $("#bdSoundLabel").textContent = label;
+  $("#bdSoundSub").textContent = sub;
+  $("#bdSound").setAttribute("aria-pressed", playing);
+  $("#bdSound").disabled = disabled;
+}
+
+function resetSound(b) {
+  player.pause();
+  soundFor = b;
+  soundUi("Hear its call", "Listen before you look");
+}
+
+player.addEventListener("playing", () => soundUi("Playing…", $("#bdSoundSub").textContent, { playing: true }));
+player.addEventListener("pause", () => soundUi("Play again", $("#bdSoundSub").textContent));
+player.addEventListener("ended", () => soundUi("Play again", $("#bdSoundSub").textContent));
+
+$("#bdSound").addEventListener("click", async () => {
+  const b = view.openBird;
+  if (!b) return;
+  if (!player.paused) return player.pause();
+  if (player.dataset.key === b.key && player.src) return player.play().catch(() => {});
+  soundUi("Finding a recording…", "From birders on iNaturalist", { playing: true });
+  const s = await birdSound(b);
+  if (view.openBird !== b) return;
+  if (!s) {
+    soundUi("No recording found", navigator.onLine ? "Nobody has shared one yet" : "Try again when you have signal", { disabled: navigator.onLine });
+    return;
+  }
+  player.src = s.url;
+  player.dataset.key = b.key;
+  soundUi("Loading…", `🎙 ${s.credit}`.slice(0, 80), { playing: true });
+  player.play().catch(() => soundUi("Couldn't play this one", "Tap to try again"));
+});
+$("#birdDialog").addEventListener("close", () => player.pause());
+
+// ---------------------------------------------------------------- trip card
+
+let shareBlob = null;
+$("#shareBtn").addEventListener("click", async () => {
+  const btn = $("#shareBtn");
+  btn.disabled = true;
+  btn.textContent = "🎨 Painting your card…";
+  try {
+    const s = store.get();
+    const areaTitles = Object.values(s.areas)
+      .sort((a, b) => a.first - b.first)
+      .map((a) => a.title);
+    shareBlob = await makeShareCard({
+      trail: s.trail,
+      sightings: s.sightings,
+      stats: tripCounts(),
+      crew: standings(null).filter((c) => c.points > 0),
+      areaTitles,
+    });
+    const img = $("#sharePreview");
+    if (img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+    img.src = URL.createObjectURL(shareBlob);
+    $("#shareDialog").showModal();
+  } catch {
+    toast("😕", "Couldn't make the card this time.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "📸 Make our trip card";
+  }
+});
+
+function saveCard() {
+  if (!shareBlob) return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(shareBlob);
+  a.download = `birddriving-trip-${new Date().toISOString().slice(0, 10)}.png`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+$("#shareSave").addEventListener("click", saveCard);
+$("#shareSend").addEventListener("click", async () => {
+  if (!shareBlob) return;
+  const file = new File([shareBlob], "birddriving-trip.png", { type: "image/png" });
+  const n = tripCounts().species;
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: "Our BirdDriving trip", text: `We spotted ${n} bird species on our road trip! 🐦🚗` });
+    } catch {
+      // Share sheet dismissed.
+    }
+  } else {
+    saveCard();
+  }
+});
 
 // ---------------------------------------------------------------- reveal
 
@@ -793,7 +890,9 @@ $("#crewBoard").addEventListener("click", (e) => {
     store.update((s) => (s.activeId = member.id));
     toast(member.avatar, `${esc(member.name)} is spotting now!`);
   } else if (confirm(`Remove ${member.name} and their sightings from this trip?`)) {
+    const areas = new Set(store.get().sightings.filter((x) => x.playerId === member.id).map((x) => x.areaId));
     removeCrew(member.id);
+    areas.forEach((a) => markDirty(member.id, a));
   }
   renderAll();
 });
@@ -1086,7 +1185,7 @@ $("#setReset").addEventListener("click", () => {
   if (!confirm("Start a new trip? This clears your crew, sightings and badges on this device.")) return;
   store.reset();
   try {
-    localStorage.removeItem("bd:syncQueue");
+    localStorage.removeItem("bd:dirty");
   } catch {
     // ignore
   }

@@ -197,5 +197,30 @@ export async function wikiSummary(title) {
   }
 }
 
+// A recording of the bird's song or call from iNaturalist (Creative Commons
+// licensed, research-grade observations, most-liked first).
+export async function birdSound(bird) {
+  const key = `bd:sound:${bird.sci}`;
+  const cached = cacheGet(key, TTL_WIKI);
+  if (cached) return cached.url ? cached : null;
+  const q = bird.taxonId ? `taxon_id=${bird.taxonId}` : `taxon_name=${encodeURIComponent(bird.sci)}`;
+  try {
+    const d = await fetchJson(
+      `https://api.inaturalist.org/v1/observations?${q}&sounds=true&quality_grade=research&order_by=votes&per_page=15&locale=en`
+    );
+    const playable = /audio\/(mpeg|mp3|mp4|x-m4a|aac|wav|x-wav)/;
+    const sounds = (d.results || []).flatMap((o) =>
+      (o.sounds || [])
+        .filter((s) => s.file_url && s.license_code && (playable.test(s.file_content_type || "") || /\.(mp3|m4a|wav)(\?|$)/i.test(s.file_url)))
+        .map((s) => ({ url: s.file_url, credit: s.attribution || "iNaturalist", page: o.uri || null, mp3: /mpeg|mp3/.test(s.file_content_type || s.file_url) }))
+    );
+    const best = sounds.find((s) => s.mp3) || sounds[0] || null;
+    cacheSet(key, best || { url: null });
+    return best;
+  } catch {
+    return null; // offline: try again next time
+  }
+}
+
 export const RARITY_INFO = RARITY;
 export { BIRDS };
