@@ -44,7 +44,7 @@ Browsers only allow location and install on **HTTPS** (or localhost). To test on
 - Birds near you: [iNaturalist](https://www.inaturalist.org) API (no key needed)
 - Photos and descriptions: iNaturalist and Wikipedia / Wikimedia Commons (credited in the app)
 - Place names: BigDataCloud reverse geocoding (free client endpoint)
-- Map: © OpenStreetMap contributors, © CARTO. Map library: Leaflet 1.9.4 (vendored)
+- Map: © OpenStreetMap contributors (Esri World Street Map as a fallback), no API key. Map library: Leaflet 1.9.4 (vendored)
 
 ## Safety
 

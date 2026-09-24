@@ -31,20 +31,36 @@ const view = {
 // ---------------------------------------------------------------- map
 
 const map = L.map("map", { zoomControl: false, worldCopyJump: true }).setView([39.5, -98.35], 4);
-const darkQuery = matchMedia("(prefers-color-scheme: dark)");
-let tiles = null;
-function setTiles() {
-  tiles?.remove();
-  const style = darkQuery.matches ? "dark_all" : "rastertiles/voyager";
-  tiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
-    subdomains: "abcd",
+// Keyless map tiles: OpenStreetMap first, Esri as a fallback if OSM tiles
+// start failing. Dark mode tints the tiles with CSS instead of a second style.
+const TILE_SOURCES = [
+  {
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     maxZoom: 19,
-    attribution:
-      '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
-  }).addTo(map);
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  },
+  {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    maxZoom: 19,
+    attribution: "Tiles © Esri, HERE, Garmin, © OpenStreetMap contributors",
+  },
+];
+let tileSource = 0;
+let tileErrors = 0;
+function setTiles() {
+  map.eachLayer((l) => l instanceof L.TileLayer && map.removeLayer(l));
+  const src = TILE_SOURCES[tileSource];
+  tileErrors = 0;
+  L.tileLayer(src.url, { maxZoom: src.maxZoom, attribution: src.attribution })
+    .on("tileerror", () => {
+      if (++tileErrors >= 6 && tileSource < TILE_SOURCES.length - 1 && navigator.onLine) {
+        tileSource += 1;
+        setTiles();
+      }
+    })
+    .addTo(map);
 }
 setTiles();
-darkQuery.addEventListener?.("change", setTiles);
 
 const trailLine = L.polyline([], {
   color: "#ff7a45", weight: 5, opacity: 0.85, dashArray: "1 11", lineCap: "round",

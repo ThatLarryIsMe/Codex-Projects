@@ -1,6 +1,6 @@
 // Offline support for dead zones: the app shell is cached up front; map tiles
 // and bird photos are cached as you drive so they still show without signal.
-const SHELL = "bd-shell-v3";
+const SHELL = "bd-shell-v4";
 const MEDIA = "bd-media-v1";
 const MEDIA_LIMIT = 800;
 
@@ -66,7 +66,7 @@ self.addEventListener("fetch", (e) => {
 
   const isMedia =
     req.destination === "image" ||
-    /basemaps\.cartocdn\.com|inaturalist|wikimedia|fonts\.(googleapis|gstatic)\.com/.test(url.hostname);
+    /tile\.openstreetmap\.org|arcgisonline\.com|inaturalist|wikimedia|fonts\.(googleapis|gstatic)\.com/.test(url.hostname);
   if (!isMedia) return;
   e.respondWith(
     caches.open(MEDIA).then(async (cache) => {

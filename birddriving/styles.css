@@ -55,7 +55,13 @@ a { color: var(--teal); }
 
 /* ---------- Map ---------- */
 #map { position: fixed; inset: 0; z-index: 0; background: #dfe9e2; }
-@media (prefers-color-scheme: dark) { #map { background: #1c2b2c; } }
+/* Soften the bright street map so markers and the route stand out. */
+.leaflet-tile-pane { filter: saturate(0.85) brightness(1.02); }
+@media (prefers-color-scheme: dark) {
+  #map { background: #1c2b2c; }
+  /* Night driving: invert the light map to a dim one without a second tile style. */
+  .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.6); }
+}
 .leaflet-control-attribution { font-size: 10px; }
 .leaflet-top.leaflet-left { top: calc(76px + var(--safe-top)); }
 
