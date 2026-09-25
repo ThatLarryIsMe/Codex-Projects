@@ -180,10 +180,22 @@ async function speciesCounts(lat, lng, radius, months) {
   return (d.results || []).filter((r) => r.taxon && r.taxon.rank === "species");
 }
 
+// Only show photos their owners licensed for reuse. "All rights reserved"
+// (no license) is never used. Non-commercial licenses are fine while the app is
+// free; flip COMMERCIAL before charging or running ads. Unlicensed photos fall
+// back to the Wikipedia/Wikimedia Commons image.
+export const COMMERCIAL = false;
+const OPEN_LICENSES = new Set(["cc0", "cc-by", "cc-by-sa"]);
+const NC_LICENSES = new Set(["cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "cc-by-nd"]);
+export function licenseOk(code) {
+  const c = String(code || "").toLowerCase();
+  return OPEN_LICENSES.has(c) || (!COMMERCIAL && NC_LICENSES.has(c));
+}
+
 function liveBird(r, i, n) {
   const t = r.taxon;
   const name = t.preferred_common_name ? titleCase(t.preferred_common_name) : t.name;
-  const photo = t.default_photo?.medium_url || null;
+  const photo = t.default_photo && licenseOk(t.default_photo.license_code) ? t.default_photo.medium_url : null;
   const live = {
     observations: r.count,
     photo,
@@ -218,7 +230,7 @@ function liveBird(r, i, n) {
 // regional field guide; with no signal it falls back to the guide entirely.
 export async function areaBirds(cell) {
   const months = seasonMonths();
-  const key = `bd:birds:v3:${cell.id}:${months[1]}`;
+  const key = `bd:birds:v4:${cell.id}:${months[1]}`;
   const cached = cacheGet(key, TTL_AREA);
   if (cached) return cached;
   const [lat, lng] = cell.center;
@@ -266,7 +278,7 @@ export async function areaBirds(cell) {
 // so it still works if signal drops by the time you get there.
 export async function prefetchArea(cell) {
   const months = seasonMonths();
-  if (cacheGet(`bd:birds:v3:${cell.id}:${months[1]}`, TTL_AREA)) return false;
+  if (cacheGet(`bd:birds:v4:${cell.id}:${months[1]}`, TTL_AREA)) return false;
   const [, data] = await Promise.all([areaName(cell), areaBirds(cell)]);
   if (data.source !== "live") return false;
   data.birds.slice(0, 16).forEach((b) => {
@@ -316,7 +328,7 @@ export async function birdSound(bird) {
     const playable = /audio\/(mpeg|mp3|mp4|x-m4a|aac|wav|x-wav)/;
     const sounds = (d.results || []).flatMap((o) =>
       (o.sounds || [])
-        .filter((s) => s.file_url && s.license_code && (playable.test(s.file_content_type || "") || /\.(mp3|m4a|wav)(\?|$)/i.test(s.file_url)))
+        .filter((s) => s.file_url && licenseOk(s.license_code) && (playable.test(s.file_content_type || "") || /\.(mp3|m4a|wav)(\?|$)/i.test(s.file_url)))
         .map((s) => ({ url: s.file_url, credit: s.attribution || "iNaturalist", page: o.uri || null, mp3: /mpeg|mp3/.test(s.file_content_type || s.file_url) }))
     );
     const best = sounds.find((s) => s.mp3) || sounds[0] || null;
