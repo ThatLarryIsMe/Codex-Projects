@@ -3,120 +3,228 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Russian Orthodox Daily Companion</title>
-    <link rel="stylesheet" href="styles.css" />
+    <title>SecondLifeIcons | Sacred Art for the Modern Home</title>
+    <meta
+      name="description"
+      content="Shop historically rooted Orthodox icons, prayer cards, framed prints, and prayer corner essentials from SecondLifeIcons in Staunton, Virginia."
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Raleway:wght@300;400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="page-wrapper">
-      <header class="site-header">
-        <div class="logo">
-          <svg
-            width="52"
-            height="80"
-            viewBox="0 0 52 80"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <path
-              d="M25.6 2C25.6 2 25.6 32 25.6 49.2C18.4 49.2 10.6 49.2 3.4 49.2C3.4 51.6 3.4 55.4 3.4 55.4C10.6 55.4 18.4 55.4 25.6 55.4C25.6 63.6 25.6 76.8 25.6 78H31.8C31.8 76.8 31.8 63.6 31.8 55.4C39 55.4 46.8 55.4 54 55.4C54 55.4 54 51.6 54 49.2C46.8 49.2 39 49.2 31.8 49.2C31.8 32 31.8 2 31.8 2H25.6Z"
-              fill="#C0892F"
-            />
-            <path
-              d="M9.8 30.6H47.6V36.8H9.8V30.6Z"
-              fill="#C0892F"
-            />
-            <path
-              d="M42.4 16.4H15V22.6H42.4V16.4Z"
-              fill="#C0892F"
-            />
-          </svg>
-          <div class="logo-text">
-            <p class="logo-title">Russian Orthodox Daily Companion</p>
-            <p class="logo-subtitle">Authentic texts for prayerful living</p>
-          </div>
-        </div>
-        <div class="controls">
-          <div class="date-selector">
-            <label for="date-picker">Select a day</label>
-            <input type="date" id="date-picker" />
-          </div>
-          <section class="month-switcher" aria-label="Liturgical calendar">
-            <div class="month-header">
-              <button id="calendar-prev" type="button" aria-label="Previous month">&#8592;</button>
-              <h2 id="calendar-month" aria-live="polite"></h2>
-              <button id="calendar-next" type="button" aria-label="Next month">&#8594;</button>
-            </div>
-            <table class="month-grid">
-              <thead>
-                <tr>
-                  <th scope="col">Sun</th>
-                  <th scope="col">Mon</th>
-                  <th scope="col">Tue</th>
-                  <th scope="col">Wed</th>
-                  <th scope="col">Thu</th>
-                  <th scope="col">Fri</th>
-                  <th scope="col">Sat</th>
-                </tr>
-              </thead>
-              <tbody id="calendar-body"></tbody>
-            </table>
-            <p class="calendar-legend" aria-live="polite">
-              <span class="legend-item legend-today">Today</span>
-              <span class="legend-item legend-data">Authentic texts available</span>
-            </p>
-          </section>
-        </div>
-      </header>
+    <header class="site-header" id="top">
+      <div class="container nav-wrap">
+        <a class="brand" href="#top" aria-label="SecondLifeIcons home">
+          <span class="brand-mark">✠</span>
+          <span>
+            <strong>SecondLifeIcons</strong>
+            <small>Sacred Art & Devotionals</small>
+          </span>
+        </a>
 
-      <main>
-        <section class="hero" aria-live="polite">
-          <h1 id="liturgical-day">Holy Glorious Leaders of the Apostles Peter and Paul</h1>
-          <p id="liturgical-note">Fourth Friday after Pentecost • Tone 3</p>
-        </section>
+        <button class="menu-toggle" aria-expanded="false" aria-controls="primary-nav" type="button">
+          Menu
+        </button>
 
-        <section class="fasting" aria-labelledby="fasting-title">
+        <nav id="primary-nav" class="primary-nav" aria-label="Primary">
+          <a href="#top">Home</a>
+          <a href="#shop-subject">Shop by Subject</a>
+          <a href="#shop-format">Shop by Format</a>
+          <a href="#about">About Us</a>
+          <a href="#contact">Contact</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container hero-content">
+          <p class="eyebrow">Historically Rooted Orthodox Art</p>
+          <h1>Sacred Art for the Modern Home.</h1>
+          <p>
+            Beautifully crafted, historically rooted Orthodox icons and prayer cards to
+            enrich your daily spiritual life.
+          </p>
+          <a class="btn" href="#shop-subject">Shop the Collection</a>
+        </div>
+      </section>
+
+      <section class="section" id="shop-subject">
+        <div class="container">
           <div class="section-heading">
-            <h2 id="fasting-title">Fasting Guidance</h2>
-            <span id="fasting-type" class="fasting-type">Fast Free</span>
+            <h2>Shop by Subject</h2>
+            <p>Find icons for your prayer life by holy person, feast, and tradition.</p>
           </div>
-          <div class="fasting-content">
-            <div class="fasting-icon" id="fasting-icon" aria-hidden="true">🍷</div>
-            <div>
-              <p id="fasting-description">
-                Festal meal in honor of the Apostles. No fasting is prescribed.
-              </p>
-              <p id="fasting-source" class="source"></p>
-            </div>
+          <div class="card-grid four-up">
+            <article class="card">
+              <h3>Icons of Christ</h3>
+              <p>Classic Pantocrator, Anastasis, and Gospel scenes for home and parish corners.</p>
+              <a href="#contact">Browse Christ Icons</a>
+            </article>
+            <article class="card">
+              <h3>Icons of the Theotokos</h3>
+              <p>Beloved Marian iconography including Sign, Tenderness, and festal depictions.</p>
+              <a href="#contact">Browse Theotokos Icons</a>
+            </article>
+            <article class="card">
+              <h3>Feast Icons</h3>
+              <p>Liturgical feast artwork curated for Great Lent, Pascha, and year-round celebrations.</p>
+              <a href="#contact">Browse Feast Icons</a>
+            </article>
+            <article class="card">
+              <h3>Church & Desert Fathers</h3>
+              <p>Patristic and monastic saints for those seeking wisdom, endurance, and repentance.</p>
+              <a href="#contact">Browse Fathers</a>
+            </article>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section class="readings" aria-labelledby="readings-title">
-          <h2 id="readings-title">Scripture Readings</h2>
-          <div id="readings-list" class="card-grid"></div>
-        </section>
+      <section class="section alt" id="shop-format">
+        <div class="container">
+          <div class="section-heading">
+            <h2>Featured Collections</h2>
+            <p>Shop by format to match your budget, gifting plans, and prayer corner setup.</p>
+          </div>
+          <div class="card-grid three-up">
+            <article class="tile">
+              <h3>Laminated Prayer Cards</h3>
+              <p class="price">Starting at $4.50</p>
+              <p>Durable daily-use cards with clean devotional typography and curated prayers.</p>
+            </article>
+            <article class="tile">
+              <h3>Wood Mounted & Framed Prints</h3>
+              <p class="price">Premium handcrafted pieces</p>
+              <p>Heirloom-ready icons featuring refined finishes, gold accents, and archival printing.</p>
+            </article>
+            <article class="tile">
+              <h3>Lenten & Feast Day Essentials</h3>
+              <p class="price">Seasonal devotional sets</p>
+              <p>Purpose-built collections for Great Lent, Holy Week, Pascha, and major feasts.</p>
+            </article>
+          </div>
+        </div>
+      </section>
 
-        <section class="saints" aria-labelledby="saints-title">
-          <h2 id="saints-title">Saints Commemorated</h2>
-          <div id="saints-list" class="saints-grid"></div>
-        </section>
-      </main>
+      <section class="section" id="difference">
+        <div class="container narrow">
+          <div class="section-heading">
+            <h2>The SecondLifeIcons Difference</h2>
+          </div>
+          <p>
+            Every piece we offer is a bridge to the ancient faith. We take pride in the
+            meticulous restoration and digital refinement of historical art styles, breathing
+            new life into classic mosaic and Byzantine depictions.
+          </p>
+          <p>
+            Our prayer cards and prints are crafted with a strict devotion to historical
+            accuracy, ensuring that every Troparion and Kontakion honors the tradition—right
+            down to highly researched Greek and liturgical source references.
+          </p>
+        </div>
+      </section>
 
-      <footer class="site-footer">
-        <p>
-          Liturgical data curated from official Russian Orthodox sources. Scripture
-          quotations follow the Orthodox Study Bible (NKJV tradition).
-        </p>
-      </footer>
-    </div>
+      <section class="section alt" id="product-strategy">
+        <div class="container">
+          <div class="section-heading">
+            <h2>Product Page Details That Convert</h2>
+            <p>Built-in copy prompts for your Shopify or WooCommerce product templates.</p>
+          </div>
+          <div class="checklist-grid">
+            <article>
+              <h3>Prayer Cards</h3>
+              <ul>
+                <li>Include the complete text of the prayer printed on each card.</li>
+                <li>Use searchable keywords tied to patron saints and intercessions.</li>
+                <li>Call out laminating durability and pocket-friendly dimensions.</li>
+              </ul>
+            </article>
+            <article>
+              <h3>Premium Icons & Framed Prints</h3>
+              <ul>
+                <li>Describe frame materials, wood mounting process, and foil accents.</li>
+                <li>Provide historical context for each icon tradition and source style.</li>
+                <li>List display recommendations for home icon corners and gifting.</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
 
-    <script src="data.js"></script>
+      <section class="section" id="about">
+        <div class="container narrow">
+          <div class="section-heading">
+            <h2>Breathing Second Life into Holy Tradition</h2>
+          </div>
+          <p>
+            Based in Staunton, Virginia, SecondLifeIcons exists to preserve and revitalize
+            sacred imagery for contemporary Orthodox homes. From wood-mounted icons to curated
+            devotional sets, each product is created with reverence, craftsmanship, and care.
+          </p>
+        </div>
+      </section>
+
+      <section class="section alt" id="social-proof">
+        <div class="container">
+          <div class="section-heading">
+            <h2>Trusted by the Faithful</h2>
+            <p>Real feedback from customers who discovered SecondLifeIcons on Etsy.</p>
+          </div>
+          <div class="card-grid three-up reviews">
+            <blockquote class="review">
+              <p>“Absolutely beautiful icon quality and careful packaging. Reverent work.”</p>
+              <cite>— Etsy Customer</cite>
+            </blockquote>
+            <blockquote class="review">
+              <p>“The prayer card is stunning and now part of my daily rule.”</p>
+              <cite>— Etsy Customer</cite>
+            </blockquote>
+            <blockquote class="review">
+              <p>“Fast shipping, excellent detail, and truly faithful to tradition.”</p>
+              <cite>— Etsy Customer</cite>
+            </blockquote>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="launch-steps">
+        <div class="container narrow">
+          <div class="section-heading">
+            <h2>Next Steps for Launch</h2>
+          </div>
+          <ol class="steps">
+            <li><strong>Platform setup:</strong> Launch on Shopify and import Etsy listings.</li>
+            <li><strong>Custom domain:</strong> Secure secondlifeicons.com or secondlifeicons.shop.</li>
+            <li><strong>Footer essentials:</strong> Add shipping/returns, newsletter signup, and a 10% welcome code.</li>
+          </ol>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer" id="contact">
+      <div class="container footer-grid">
+        <div>
+          <h2>Contact</h2>
+          <p>Questions about custom icon sets, parish orders, or wholesale?</p>
+          <a href="mailto:hello@secondlifeicons.com">hello@secondlifeicons.com</a>
+        </div>
+        <div>
+          <h2>Policies</h2>
+          <ul>
+            <li><a href="#">Shipping Policy</a></li>
+            <li><a href="#">Returns Policy</a></li>
+            <li><a href="#">Newsletter Sign-up</a></li>
+          </ul>
+        </div>
+      </div>
+      <p class="copyright">© <span id="year"></span> SecondLifeIcons. All rights reserved.</p>
+    </footer>
+
     <script src="app.js"></script>
   </body>
 </html>
