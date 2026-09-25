@@ -4,7 +4,7 @@ import { makeShareCard } from "./share.js";
 import { store, addCrew, removeCrew, crewById, standings, AVATARS } from "./store.js";
 import { sketchDataUri } from "./sketch.js";
 import { chirp, confetti, vibrate } from "./fx.js";
-import { detectServer, isShared, markDirty, fetchBoard, flush } from "./leaderboard.js";
+import { detectServer, isShared, markDirty, fetchBoard, flush, API_BASE, createRoom, lookupRoom, joinRoom, leaveRoom, fetchRoomBoard, normalizeCode } from "./leaderboard.js";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -789,6 +789,7 @@ function showReveal(prevArea) {
 
 function closeReveal() {
   $("#reveal").hidden = true;
+  setTimeout(promptLinkedRoom, 400);
 }
 $("#revealGo").addEventListener("click", () => {
   closeReveal();
@@ -920,7 +921,195 @@ function renderLeaders() {
         )
         .join("")
     : `<li><span class="who"><b>No spotters yet</b><small>Add everyone in the car to start competing.</small></span></li>`;
-  if (view.tab === "leaders") renderWorld();
+  if (view.tab === "leaders") {
+    renderWorld();
+    renderRoom();
+  }
+}
+
+// ---------------------------------------------------------------- private rooms
+
+// Rows for a room board. Our own crew comes from this device (always current,
+// even before the sync lands); everyone else comes from the server.
+function roomRows(data) {
+  const mine = new Map(standings(null).map((c) => [c.id, c]));
+  const rows = (data?.entries || []).filter((e) => !mine.has(e.playerId));
+  for (const c of mine.values()) rows.push({ playerId: c.id, name: c.name, avatar: c.avatar, count: c.count, points: c.points, mine: true });
+  return rows.sort((a, b) => b.points - a.points || b.count - a.count);
+}
+
+async function renderRoom() {
+  const card = $("#roomCard");
+  if (!isShared()) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  const room = store.get().room;
+  if (!room) {
+    card.innerHTML = `<div class="room-head"><span class="room-ico" aria-hidden="true">🏁</span><div><b>Private room</b>
+      <small>Race your family and friends, even in other cars.</small></div></div>
+      <div class="room-actions"><button class="btn btn-sun" type="button" data-room="create">Create a room</button>
+      <button class="btn btn-ghost" type="button" data-room="join">Join with a code</button></div>`;
+    return;
+  }
+  if (!$("#roomBoard") || card.dataset.code !== room.code) {
+    card.dataset.code = room.code;
+    card.innerHTML = `<div class="room-head"><span class="room-ico" aria-hidden="true">🏁</span><div><b>${esc(room.name)}</b>
+      <small>Room code <span class="code">${esc(room.code)}</span></small></div>
+      <button class="btn btn-small btn-sun" type="button" data-room="invite">Invite</button></div>
+      <ol class="board" id="roomBoard"></ol>
+      <button class="link-btn" type="button" data-room="leave">Leave room</button>`;
+  }
+  const draw = (data) => {
+    const list = $("#roomBoard");
+    if (!list) return;
+    list.innerHTML = roomRows(data)
+      .map(
+        (e, i) => `<li class="${e.mine ? "me" : ""}"><span class="rank">${e.points ? MEDALS[i] || i + 1 : i + 1}</span>
+        <span class="av">${esc(e.avatar)}</span><span class="who"><b>${esc(e.name)}</b><small>${e.count} species${e.mine ? " · this phone" : ""}</small></span>
+        <span class="pts">${e.points}<small>pts</small></span></li>`
+      )
+      .join("");
+  };
+  draw(null);
+  const data = await fetchRoomBoard(room.code);
+  if (store.get().room?.code === room.code) draw(data);
+}
+
+const SITE = API_BASE || `${location.origin}${location.pathname}`;
+
+async function inviteToRoom(room) {
+  const url = `${SITE}?room=${room.code}`;
+  const text = `Join our BirdDriving room "${room.name}"! Code: ${room.code}`;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "BirdDriving room", text, url });
+    } catch {
+      // Share sheet dismissed.
+    }
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    toast("📋", "Invite link copied. Paste it in a text!");
+  } catch {
+    toast("🏁", `Room code: <b>${esc(room.code)}</b>`);
+  }
+}
+
+function roomView(html) {
+  $("#roomBody").innerHTML = html;
+  if (!$("#roomDialog").open) $("#roomDialog").showModal();
+}
+
+function showCreatedRoom(room) {
+  roomView(`<h2>You're in! 🏁</h2>
+    <p class="muted">Share this code with everyone playing, in this car or any other.</p>
+    <div class="big-code" aria-label="Room code">${esc(room.code)}</div>
+    <p class="muted small" style="text-align:center">${esc(room.name)}</p>
+    <div class="modal-row"><button class="btn btn-ghost" type="button" data-close>Done</button>
+    <button class="btn btn-sun" type="button" id="roomInvite">Share invite</button></div>`);
+  $("#roomInvite").onclick = () => inviteToRoom(room);
+}
+
+function openCreateRoom() {
+  const first = store.get().crew[0]?.name;
+  roomView(`<h2>Start a private room</h2>
+    <p class="muted">One leaderboard for your whole group. Friends can join from other cars with the code.</p>
+    <form id="roomCreateForm"><label class="field"><span>Room name</span>
+      <input id="roomName" maxlength="40" autocomplete="off" value="${esc(first ? `${first}'s Road Trip` : "Our Road Trip")}" /></label>
+      <p class="form-error" id="roomErr"></p>
+      <div class="modal-row"><button class="btn btn-ghost" type="button" data-close>Cancel</button>
+      <button class="btn btn-sun" type="submit">Create room</button></div></form>`);
+  $("#roomCreateForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = e.submitter || $("#roomCreateForm button[type=submit]");
+    btn.disabled = true;
+    try {
+      const room = await createRoom($("#roomName").value);
+      if (store.get().room) await leaveRoom();
+      joinRoom(room);
+      renderRoom();
+      showCreatedRoom(room);
+    } catch {
+      $("#roomErr").textContent = "Couldn't create the room. Check your signal and try again.";
+      btn.disabled = false;
+    }
+  };
+}
+
+function openJoinRoom(preset = "") {
+  roomView(`<h2>Join a room</h2>
+    <p class="muted">Type the 6-letter code from whoever started the room.</p>
+    <form id="roomJoinForm"><input id="roomCode" class="code-input" maxlength="6" autocomplete="off" autocapitalize="characters"
+      spellcheck="false" placeholder="ABC234" value="${esc(preset)}" aria-label="Room code" style="width:100%;margin-top:14px" />
+      <p class="form-error" id="roomErr"></p>
+      <div class="modal-row"><button class="btn btn-ghost" type="button" data-close>Cancel</button>
+      <button class="btn btn-sun" type="submit">Join</button></div></form>`);
+  const input = $("#roomCode");
+  input.oninput = () => (input.value = normalizeCode(input.value));
+  $("#roomJoinForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const code = normalizeCode(input.value);
+    if (code.length !== 6) return ($("#roomErr").textContent = "Room codes are 6 letters and numbers.");
+    const btn = $("#roomJoinForm button[type=submit]");
+    btn.disabled = true;
+    try {
+      const room = await lookupRoom(code);
+      if (!room) {
+        $("#roomErr").textContent = "No room with that code. Double-check the letters.";
+        btn.disabled = false;
+        return;
+      }
+      const current = store.get().room;
+      if (current?.code === room.code) {
+        $("#roomDialog").close();
+        return toast("🏁", `You're already in <b>${esc(room.name)}</b>.`);
+      }
+      if (current && !confirm(`Leave "${current.name}" and join "${room.name}"?`)) {
+        btn.disabled = false;
+        return;
+      }
+      if (current) await leaveRoom();
+      joinRoom(room);
+      $("#roomDialog").close();
+      selectTab("leaders");
+      setSheet("half");
+      renderRoom();
+      if (store.get().settings.sound) chirp("area");
+      toast("🏁", `Joined <b>${esc(room.name)}</b>! Let the bird race begin.`);
+    } catch {
+      $("#roomErr").textContent = "Couldn't reach the server. Check your signal and try again.";
+      btn.disabled = false;
+    }
+  };
+  if (!preset) input.focus();
+}
+
+$("#roomCard").addEventListener("click", async (e) => {
+  const act = e.target.closest("[data-room]")?.dataset.room;
+  const room = store.get().room;
+  if (act === "create") openCreateRoom();
+  else if (act === "join") openJoinRoom();
+  else if (act === "invite" && room) inviteToRoom(room);
+  else if (act === "leave" && room && confirm(`Leave "${room.name}"? Your car's scores will be removed from its board.`)) {
+    await leaveRoom();
+    renderRoom();
+    toast("👋", `Left ${esc(room.name)}.`);
+  }
+});
+
+// Invite links look like https://birddriving.vercel.app/?room=ABC234
+const linkedRoom = normalizeCode(new URLSearchParams(location.search).get("room"));
+if (linkedRoom) history.replaceState(null, "", location.pathname);
+let linkPending = linkedRoom.length === 6;
+// Shown once the welcome screens are out of the way (they call this on close).
+function promptLinkedRoom() {
+  if (!linkPending || !isShared() || !store.get().onboarded) return;
+  if (!$("#reveal").hidden || !$("#onboard").hidden) return;
+  linkPending = false;
+  if (store.get().room?.code !== linkedRoom) openJoinRoom(linkedRoom);
 }
 
 async function renderWorld() {
@@ -932,7 +1121,7 @@ async function renderWorld() {
     list.innerHTML = "";
     note.textContent = isShared()
       ? "Couldn't reach the leaderboard. It will refresh when you have signal."
-      : "Your car is competing on this device. When BirdDriving runs on its server (node server.js), every traveler shares area leaderboards.";
+      : "Your car is competing on this device. Shared and private leaderboards turn on when BirdDriving runs with its server.";
     return;
   }
   const mine = new Set(store.get().crew.map((c) => c.id));
@@ -1014,6 +1203,7 @@ $("#addCrewBtn").addEventListener("click", openCrewDialog);
 $("#crewForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const m = addCrew($("#crewName").value, pickedAvatar);
+  if (store.get().room) markDirty(m.id); // show the new spotter on the room board
   $("#crewDialog").close();
   toast(m.avatar, `${esc(m.name)} joined the crew!`);
   renderAll();
@@ -1151,7 +1341,10 @@ function selectTab(tab) {
   view.tab = tab;
   $$(".tab").forEach((t) => t.setAttribute("aria-selected", t.dataset.tab === tab));
   $$(".panel").forEach((p) => (p.hidden = p.dataset.panel !== tab));
-  if (tab === "leaders") renderWorld();
+  if (tab === "leaders") {
+    renderWorld();
+    renderRoom();
+  }
   $(".panels").scrollTop = 0;
 }
 
@@ -1325,6 +1518,7 @@ function showOnboarding() {
     renderAll();
     if (demo) startDemo();
     else startGeo();
+    setTimeout(promptLinkedRoom, 600);
   };
   $("#obLocate").onclick = () => finish(false);
   $("#obDemo").onclick = () => finish(true);
@@ -1351,8 +1545,14 @@ function boot() {
   detectServer().then(() => {
     flush();
     renderWorld();
+    renderRoom();
+    if (store.get().onboarded) promptLinkedRoom();
   });
-  setInterval(() => view.tab === "leaders" && renderWorld(), 30000);
+  setInterval(() => {
+    if (view.tab !== "leaders") return;
+    renderWorld();
+    renderRoom();
+  }, 30000);
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }

@@ -4,7 +4,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseScore, areaRow, tripRow, rank, AREA_RE } from "./api/_lib.js";
+import { parseScore, areaRow, tripRow, rank, AREA_RE, newRoomCode, parseRoomCode, safeName } from "./api/_lib.js";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(ROOT, "data");
@@ -23,7 +23,8 @@ const TYPES = {
 };
 
 // db.area: { "<area>|<playerId>": areaRow }   db.trip: { playerId: tripRow }
-let db = { area: {}, trip: {} };
+// db.rooms: { CODE: { code, name, created, members: { playerId: tripRow } } }
+let db = { area: {}, trip: {}, rooms: {} };
 try {
   db = { ...db, ...JSON.parse(fs.readFileSync(DB_FILE, "utf8")) };
 } catch {
@@ -76,15 +77,75 @@ function send(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
+// Same cached iNaturalist proxy as api/birds.js, with an in-memory cache.
+const birdCache = new Map();
+async function birds(res, url) {
+  const q = url.searchParams;
+  const lat = Number(q.get("lat"));
+  const lng = Number(q.get("lng"));
+  const radius = Number(q.get("radius"));
+  const months = q.get("month") ? q.get("month").split(",").map(Number) : [];
+  const valid =
+    Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && [40, 100, 200].includes(radius) &&
+    months.length <= 3 && months.every((m) => m >= 1 && m <= 12);
+  if (!valid || q.get("lat") === null || q.get("lng") === null) return send(res, 400, { error: "invalid" });
+  const key = `${lat},${lng},${radius},${months.join(",")}`;
+  const hit = birdCache.get(key);
+  if (hit && Date.now() - hit.t < 7 * 864e5) return send(res, 200, hit.v);
+  try {
+    const r = await fetch(
+      `https://api.inaturalist.org/v1/observations/species_counts?lat=${lat}&lng=${lng}&radius=${radius}` +
+        `&iconic_taxa=Aves&quality_grade=research&captive=false&per_page=50&locale=en` +
+        (months.length ? `&month=${months.join(",")}` : "")
+    );
+    if (!r.ok) throw new Error(String(r.status));
+    const v = { results: (await r.json()).results || [] };
+    birdCache.set(key, { t: Date.now(), v });
+    return send(res, 200, v);
+  } catch {
+    return send(res, 502, { error: "upstream unavailable" });
+  }
+}
+
 async function api(req, res, url) {
   if (url.pathname === "/api/health") return send(res, 200, { ok: true });
+  if (url.pathname === "/api/birds" && req.method === "GET") return birds(res, url);
   if (url.pathname === "/api/leaderboard" && req.method === "GET") {
     const area = url.searchParams.get("area");
-    if (area && !AREA_RE.test(area)) return send(res, 400, { error: "invalid area" });
+    const roomParam = url.searchParams.get("room");
+    const room = roomParam ? parseRoomCode(roomParam) : null;
+    if ((area && !AREA_RE.test(area)) || (roomParam && !room)) return send(res, 400, { error: "invalid" });
+    if (room) {
+      const members = Object.values(db.rooms[room]?.members || {});
+      return send(res, 200, { area: null, room, entries: rank(members, { keepZero: true }) });
+    }
     const rows = area
       ? Object.entries(db.area).filter(([k]) => k.startsWith(area + "|")).map(([, v]) => v)
       : Object.values(db.trip);
     return send(res, 200, { area: area || null, entries: rank(rows) });
+  }
+  if (url.pathname === "/api/rooms") {
+    if (req.method === "GET") {
+      const code = parseRoomCode(url.searchParams.get("code"));
+      if (!code) return send(res, 400, { error: "invalid code" });
+      const r = db.rooms[code];
+      return r ? send(res, 200, { code, name: r.name, created: r.created }) : send(res, 404, { error: "no such room" });
+    }
+    if (req.method === "POST") {
+      if (limited(req.socket.remoteAddress)) return send(res, 429, { error: "slow down" });
+      let body = {};
+      try {
+        body = (await readBody(req)) || {};
+      } catch {
+        return send(res, 400, { error: "bad body" });
+      }
+      let code = newRoomCode();
+      while (db.rooms[code]) code = newRoomCode();
+      db.rooms[code] = { code, name: safeName(body.name, 40, "Road Trip Crew"), created: Date.now(), members: {} };
+      persist();
+      const { members, ...room } = db.rooms[code];
+      return send(res, 200, room);
+    }
   }
   if (url.pathname === "/api/scores" && req.method === "POST") {
     if (limited(req.socket.remoteAddress)) return send(res, 429, { error: "slow down" });
@@ -95,12 +156,20 @@ async function api(req, res, url) {
       return send(res, 400, { error: "bad body" });
     }
     if (!rec) return send(res, 400, { error: "invalid" });
-    const row = areaRow(rec);
-    const k = `${rec.area}|${rec.playerId}`;
-    if (row.count) db.area[k] = row;
-    else delete db.area[k];
-    if (rec.trip.count) db.trip[rec.playerId] = tripRow(rec);
+    if (rec.area) {
+      const row = areaRow(rec);
+      const k = `${rec.area}|${rec.playerId}`;
+      if (row.count) db.area[k] = row;
+      else delete db.area[k];
+    }
+    const trip = tripRow(rec);
+    if (trip.count) db.trip[rec.playerId] = trip;
     else delete db.trip[rec.playerId];
+    if (rec.room && db.rooms[rec.room]) {
+      if (rec.removed) delete db.rooms[rec.room].members[rec.playerId];
+      else db.rooms[rec.room].members[rec.playerId] = { ...trip, updated: Date.now() };
+    }
+    if (rec.leave && rec.leave !== rec.room && db.rooms[rec.leave]) delete db.rooms[rec.leave].members[rec.playerId];
     persist();
     return send(res, 200, { ok: true });
   }

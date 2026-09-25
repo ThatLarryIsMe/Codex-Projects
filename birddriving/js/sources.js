@@ -1,6 +1,7 @@
 // Network data sources, each with a local cache so the app keeps working in
 // dead zones. Every function resolves (never rejects) with a best-effort value.
 import { BIRDS, RARITY, curatedForRegion, findCurated, guessGroup, regionFor, REGION_NAMES } from "./birds.js";
+import { API_BASE } from "./leaderboard.js";
 
 const CELL = 0.5; // degrees; one "area" is roughly a 35-mile square
 const TTL_AREA = 1000 * 60 * 60 * 24 * 7;
@@ -156,12 +157,26 @@ export function seasonLabel(months) {
   return `${MONTH_NAMES[months[0] - 1]}–${MONTH_NAMES[months[2] - 1]}`;
 }
 
+// Prefer our cached proxy (one upstream call per area per week for everyone);
+// fall back to iNaturalist directly when the proxy isn't there (static hosting).
+let proxyOk = true;
 async function speciesCounts(lat, lng, radius, months) {
-  const url =
-    `https://api.inaturalist.org/v1/observations/species_counts?lat=${lat}&lng=${lng}&radius=${radius}` +
-    `&iconic_taxa=Aves&quality_grade=research&captive=false&per_page=50&locale=en` +
-    (months ? `&month=${months.join(",")}` : "");
-  const d = await fetchJson(url, 12000);
+  const q = `lat=${lat}&lng=${lng}&radius=${radius}` + (months ? `&month=${months.join(",")}` : "");
+  let d = null;
+  if (proxyOk) {
+    try {
+      d = await fetchJson(`${API_BASE}api/birds?${q}`, 12000);
+    } catch (e) {
+      if (/HTTP 404/.test(String(e?.message))) proxyOk = false;
+    }
+  }
+  if (!d) {
+    d = await fetchJson(
+      `https://api.inaturalist.org/v1/observations/species_counts?${q}` +
+        `&iconic_taxa=Aves&quality_grade=research&captive=false&per_page=50&locale=en`,
+      12000
+    );
+  }
   return (d.results || []).filter((r) => r.taxon && r.taxon.rank === "species");
 }
 

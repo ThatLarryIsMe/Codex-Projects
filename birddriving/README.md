@@ -12,6 +12,7 @@ A road-trip bird hunt for the whole car. The map follows you as you drive and sh
 - **Bird cards**: photos, rarity (1/3/5 points), a kid fact, a "where to look from the car" tip, a size comparison, and a description.
 - **Spotting**: choose everyone in the car who saw it. You get confetti, a birdsong chirp, and an Undo button.
 - **Leaderboards**: per area and for the whole trip. Your car always has one. Deployed on Vercel with Blob storage, or run with `server.js`, everyone on the road shares a board too.
+- **Private rooms**: create a room, share its 6-character code or invite link (`?room=CODE`), and everyone who joins, in any car, shares one whole-trip leaderboard. Room members show even at zero points; leaving removes your car's rows.
 - **Road Trip Bingo**: a 3×3 card for each area with a free car square in the middle.
 - **Journal**: species, points, areas and miles, plus 10 badges and a trip log.
 - **Kid mode**: bigger cards, fun facts first, no Latin names.
@@ -38,6 +39,18 @@ node server.js          # http://localhost:8080  (PORT=xxxx to change)
 `server.js` is the self-hosted option (Node 18+, no dependencies needed). It serves the app and stores shared leaderboards in `data/leaderboard.json`. You can also host the folder on any static host. The app still works there, but leaderboards stay on each device.
 
 Browsers only allow location and install on **HTTPS** (or localhost). To test on a phone, deploy behind HTTPS or use a tunnel.
+
+## API (Vercel functions in `api/`, mirrored by `server.js`)
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/health` | `{"ok":true}` when storage is connected |
+| `POST /api/scores` | A spotter's full standing (area, whole trip, optional `room` / `leave`) |
+| `GET /api/leaderboard[?area=\|?room=]` | Global trip board, one area's board, or a private room's board |
+| `POST /api/rooms`, `GET /api/rooms?code=` | Create a room / look one up |
+| `GET /api/birds?lat&lng&radius&month` | Cached iNaturalist proxy (edge-cached a week per area) |
+
+All endpoints send CORS headers so the app-store builds can call the hosted API.
 
 ## Data sources
 
