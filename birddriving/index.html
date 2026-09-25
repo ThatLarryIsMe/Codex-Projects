@@ -111,6 +111,7 @@
           <div class="bingo" id="bingo"></div>
         </div>
         <div class="panel" data-panel="leaders" role="tabpanel" hidden>
+          <section class="room-card" id="roomCard" hidden aria-label="Private room"></section>
           <div class="seg" id="boardSeg">
             <button data-scope="area" aria-pressed="true">This area</button>
             <button data-scope="trip" aria-pressed="false">Whole trip</button>
@@ -120,7 +121,7 @@
           <div class="crew-add">
             <button class="btn btn-ghost" id="addCrewBtn" type="button">+ Add a spotter</button>
           </div>
-          <h3 class="panel-h">Everyone on the road</h3>
+          <h3 class="panel-h">Everyone on the road <small class="muted">· global</small></h3>
           <ol class="board" id="worldBoard"></ol>
           <p class="source-note" id="worldNote"></p>
         </div>
@@ -191,6 +192,11 @@
           <button class="btn btn-sun" type="submit">Add</button>
         </div>
       </form>
+    </dialog>
+
+    <!-- Private rooms -->
+    <dialog class="modal small-modal" id="roomDialog" aria-label="Private room">
+      <div id="roomBody"></div>
     </dialog>
 
     <!-- Trip card -->
