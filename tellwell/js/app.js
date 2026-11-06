@@ -265,7 +265,7 @@ async function handleFile(file) {
       if (t) t.textContent = `Finding chapters and cleaning up the text… ${Math.round(f * 100)}%`;
     });
     const last = JSON.parse(localStorage.getItem("tellwell.lastChoice") || "{}");
-    let provider = last.provider && PROVIDERS[last.provider] ? last.provider : "elevenlabs";
+    let provider = last.provider && PROVIDERS[last.provider] ? last.provider : "openai";
     if (!hasKey(provider) && hasKey("openai")) provider = "openai";
     importState = {
       ...parsed,
@@ -908,9 +908,9 @@ async function settingsSheet() {
     "Settings",
     `
     <div class="set-section"><h3>Voice services</h3>
-      <div class="small muted" style="margin-bottom:10px">${row("elevenlabs")}${row("openai")}${server.mock ? `<div><span class="status-dot ok"></span>Test mode: voices are replaced with tones</div>` : ""}</div>
-      <div class="field"><label for="k-el">Your ElevenLabs API key</label><input class="input" id="k-el" type="password" autocomplete="off" value="${esc(s.keys.elevenlabs || "")}" placeholder="Only needed if the server has none" /></div>
+      <div class="small muted" style="margin-bottom:10px">${row("openai")}${row("elevenlabs")}${server.mock ? `<div><span class="status-dot ok"></span>Test mode: voices are replaced with tones</div>` : ""}</div>
       <div class="field"><label for="k-oa">Your OpenAI API key</label><input class="input" id="k-oa" type="password" autocomplete="off" value="${esc(s.keys.openai || "")}" placeholder="Only needed if the server has none" /></div>
+      <div class="field"><label for="k-el">Your ElevenLabs API key (optional)</label><input class="input" id="k-el" type="password" autocomplete="off" value="${esc(s.keys.elevenlabs || "")}" placeholder="Only needed if the server has none" /></div>
       ${server.passcode || s.passcode ? `<div class="field"><label for="k-pc">App passcode</label><input class="input" id="k-pc" type="password" value="${esc(s.passcode || "")}" /></div>` : ""}
       <p class="tiny faint">Keys are saved in this browser only and sent to your Tellwell server with each request.</p>
       <button class="btn primary" id="saveKeys">Save</button>

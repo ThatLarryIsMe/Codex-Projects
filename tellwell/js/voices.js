@@ -1,9 +1,25 @@
 // Voice catalog, narration styles and cost estimates.
 
 export const PROVIDERS = {
+  openai: {
+    name: "OpenAI",
+    blurb: "Natural, affordable narration that takes direction: the style below is sent with every passage. About $0.90 per hour of audio, and several passages are narrated at once, so books finish quickly.",
+    keyHint: "platform.openai.com → API keys",
+    chunkChars: 1400,
+    models: [{ id: "gpt-4o-mini-tts", name: "GPT-4o mini TTS", note: "Steerable narration. ≈ $0.015 per minute of audio.", dollarsPerMinute: 0.015 }],
+    voices: [
+      { id: "cedar", name: "Cedar", tag: "Natural, grounded male", gender: "m", best: "Fiction, nonfiction" },
+      { id: "marin", name: "Marin", tag: "Natural, bright female", gender: "f", best: "Contemporary, memoir" },
+      { id: "fable", name: "Fable", tag: "Expressive British storyteller", gender: "m", best: "Fantasy, children's" },
+      { id: "onyx", name: "Onyx", tag: "Deep, steady male", gender: "m", best: "Thrillers, history" },
+      { id: "ballad", name: "Ballad", tag: "Warm, emotive male", gender: "m", best: "Literary fiction, poetry" },
+      { id: "sage", name: "Sage", tag: "Calm, thoughtful female", gender: "f", best: "Nonfiction, devotional" },
+      { id: "coral", name: "Coral", tag: "Warm, lively female", gender: "f", best: "YA, romance" },
+    ],
+  },
   elevenlabs: {
     name: "ElevenLabs",
-    blurb: "The most human-sounding narration available. Chunks are stitched together so each chapter reads as one continuous performance.",
+    blurb: "Premium option. Very human-sounding, but credits get expensive for full-length books.",
     keyHint: "elevenlabs.io → Profile → API Keys",
     chunkChars: 1800,
     models: [
@@ -19,22 +35,6 @@ export const PROVIDERS = {
       { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda", tag: "Warm, friendly American", gender: "f", best: "Memoir, YA, self-help" },
       { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice", tag: "Clear, confident British", gender: "f", best: "Nonfiction, education" },
       { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", tag: "Soft, reassuring American", gender: "f", best: "Contemporary fiction, devotional" },
-    ],
-  },
-  openai: {
-    name: "OpenAI",
-    blurb: "Very affordable and takes direction: the narration style below is sent with every passage. Roughly $0.015 per minute of audio.",
-    keyHint: "platform.openai.com → API keys",
-    chunkChars: 1400,
-    models: [{ id: "gpt-4o-mini-tts", name: "GPT-4o mini TTS", note: "Steerable narration. ≈ $0.015 per minute of audio.", dollarsPerMinute: 0.015 }],
-    voices: [
-      { id: "cedar", name: "Cedar", tag: "Natural, grounded male", gender: "m", best: "Fiction, nonfiction" },
-      { id: "marin", name: "Marin", tag: "Natural, bright female", gender: "f", best: "Contemporary, memoir" },
-      { id: "fable", name: "Fable", tag: "Expressive British storyteller", gender: "m", best: "Fantasy, children's" },
-      { id: "onyx", name: "Onyx", tag: "Deep, steady male", gender: "m", best: "Thrillers, history" },
-      { id: "ballad", name: "Ballad", tag: "Warm, emotive male", gender: "m", best: "Literary fiction, poetry" },
-      { id: "sage", name: "Sage", tag: "Calm, thoughtful female", gender: "f", best: "Nonfiction, devotional" },
-      { id: "coral", name: "Coral", tag: "Warm, lively female", gender: "f", best: "YA, romance" },
     ],
   },
 };

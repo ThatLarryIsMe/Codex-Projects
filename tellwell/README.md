@@ -10,9 +10,8 @@ Upload a PDF and get a naturally narrated audiobook you can listen to right in t
    - Unticks the contents page, copyright, index and notes by default. You review the chapter list before anything is narrated: rename, merge, include or exclude.
 2. **Narrating in chunks**
    - Each chapter is split at paragraph or sentence boundaries, about 1,800 characters per chunk for ElevenLabs and 1,400 for OpenAI. A chunk never cuts a sentence in half.
-   - Chunks within a chapter are narrated **in order**. Each request is told what was just read and what comes next. ElevenLabs gets `previous_request_ids`, `previous_text` and `next_text`. OpenAI gets the previous sentence as part of its direction. This keeps tone and pacing consistent, so a chapter sounds like one take.
+   - Every request carries context so tone and pacing stay consistent across a chapter. **OpenAI (default)** gets the narration direction plus the end of the previous passage. Each request is self-contained, so 4 passages are narrated at once, closest to where you're listening first. ElevenLabs (optional) chains each chunk to the audio before it (`previous_request_ids`, `previous_text`, `next_text`), so its chunks within a chapter go strictly in order.
    - Pauses are added as real silence after each chunk: a beat after the chapter title, a paragraph pause, a longer rest at scene breaks (`* * *`) and at the end of a chapter.
-   - Two chapters are narrated at a time, starting with the one you're listening to.
 3. **Listening**
    - Playback starts as soon as the first passage is ready. Each chapter plays as one continuous track with a scrubber, skip back 15 s and forward 30 s, speed from 0.8× to 2× (pitch preserved), a sleep timer, and lock-screen and headphone controls.
    - Read-along text highlights the passage being spoken. Tap any paragraph to jump to it.
@@ -22,8 +21,8 @@ Upload a PDF and get a naturally narrated audiobook you can listen to right in t
 
 | Provider | Voices | Cost for a typical novel (≈ 90k words, 500k characters, ≈ 10 h) |
 |---|---|---|
-| **ElevenLabs**: most human-sounding, with request stitching | George, Brian, Bill, Daniel, Lily, Matilda, Alice and Sarah, plus any voice in your account (including Voice Library narrators you've saved) | ≈ 500k credits on Multilingual v2, or half that on Flash v2.5 |
-| **OpenAI** `gpt-4o-mini-tts`: steerable and cheap | Cedar, Marin, Fable, Onyx, Ballad, Sage and Coral | ≈ $9 |
+| **OpenAI** `gpt-4o-mini-tts` (**default**): natural, steerable, cheap | Cedar (default), Marin, Fable, Onyx, Ballad, Sage and Coral | ≈ $9 (about $0.90 per hour of audio) |
+| ElevenLabs (optional premium) | George, Brian, Bill, Daniel, Lily, Matilda, Alice and Sarah, plus any voice in your account | ≈ 500k credits, which needs one of the pricier plans |
 
 Narration styles (Literary, Suspense, Nonfiction, Classic, Devotional, Children's) set ElevenLabs' expressiveness and are sent to OpenAI as performance direction.
 
@@ -33,7 +32,8 @@ Narration styles (Literary, Suspense, Nonfiction, Classic, Devotional, Children'
 
 1. vercel.com/new → import this repo → **Root Directory: `tellwell`**. Framework "Other", no build command → Deploy.
 2. **Settings → Environment Variables**:
-   - `ELEVENLABS_API_KEY` and/or `OPENAI_API_KEY`
+   - `OPENAI_API_KEY` (from platform.openai.com → API keys; the account needs billing set up)
+   - `ELEVENLABS_API_KEY` (optional)
    - `APP_PASSCODE` (**recommended** once keys are on the server, so strangers can't use your credits; the app asks for it once)
 3. Redeploy. Check `https://<app>.vercel.app/api/health`.
 
@@ -45,7 +45,7 @@ On a phone, open the site and choose **Add to Home Screen** to get a full-screen
 
 ```bash
 cd tellwell
-ELEVENLABS_API_KEY=... OPENAI_API_KEY=... node server.js   # http://localhost:8080
+OPENAI_API_KEY=... node server.js   # http://localhost:8080
 MOCK_TTS=1 node server.js                                  # offline test mode: tones instead of voices (needs ffmpeg)
 ```
 

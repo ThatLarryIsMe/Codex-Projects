@@ -1,13 +1,17 @@
-// Narration engine. Walks a book chunk by chunk, in order within each chapter,
-// so every request can be told what was just read and what comes next
-// (ElevenLabs request stitching / OpenAI continuity direction). Chapters are
-// worked in parallel, starting with the one being listened to.
+// Narration engine.
+// ElevenLabs: chunks within a chapter go strictly in order, because each request
+// is chained to the audio of the ones before it (request stitching); chapters
+// run in parallel.
+// OpenAI: each request carries its own context (the previous passage's text and
+// the narration direction), so passages are narrated several at a time, always
+// the ones nearest to where you're listening first.
 import { db } from "./db.js";
 import { synth } from "./api.js";
 import { prepareChunk } from "./audio.js";
 import { STYLES } from "./voices.js";
 
 const STITCH_WINDOW_MS = 100 * 60 * 1000; // ElevenLabs keeps request ids for ~2 h
+const PARALLEL_PASSAGES = 4; // OpenAI requests in flight at once
 const FATAL = new Set(["auth", "no_key", "quota", "passcode", "bad_request"]);
 const sleep = (ms, signal) =>
   new Promise((resolve) => {
@@ -63,6 +67,24 @@ export class Generator extends EventTarget {
     else if (this.running) this.wake();
   }
 
+  stitched() {
+    return this.book?.provider === "elevenlabs";
+  }
+
+  // Next unit of work not already taken: a whole chapter when stitching,
+  // otherwise a single passage ("ch|k"), nearest to the listener first.
+  nextUnit(busy) {
+    for (const ch of this.queue()) {
+      if (this.stitched()) {
+        if (!busy.has(ch)) return { ch };
+        continue;
+      }
+      const n = this.book.chapters[ch].chunks.length;
+      for (let k = 0; k < n; k++) if (!this.done.has(`${ch}|${k}`) && !busy.has(`${ch}|${k}`)) return { ch, k };
+    }
+    return null;
+  }
+
   // Chapters this run may work on, nearest to the listener first.
   queue() {
     const n = this.book.chapters.length;
@@ -81,7 +103,8 @@ export class Generator extends EventTarget {
     const busy = (this.busyChapters = new Set());
     this.emit("state");
     this.lock();
-    const workers = Array.from({ length: this.concurrency }, () => this.worker(ctrl.signal, busy));
+    const n = this.stitched() ? this.concurrency : PARALLEL_PASSAGES;
+    const workers = Array.from({ length: n }, () => this.worker(ctrl.signal, busy));
     Promise.all(workers).then(() => {
       if (this.ctrl !== ctrl) return; // a newer run has taken over
       this.running = false;
@@ -98,13 +121,15 @@ export class Generator extends EventTarget {
 
   async worker(signal, busy) {
     while (!signal.aborted && !this.blocked) {
-      const ch = this.queue().find((c) => !busy.has(c));
-      if (ch !== undefined) {
-        busy.add(ch);
+      const unit = this.nextUnit(busy);
+      if (unit) {
+        const id = unit.k === undefined ? unit.ch : `${unit.ch}|${unit.k}`;
+        busy.add(id);
         try {
-          await this.narrateChapter(ch, signal);
+          if (unit.k === undefined) await this.narrateChapter(unit.ch, signal);
+          else await this.narrateChunk(unit.ch, unit.k, signal);
         } finally {
-          busy.delete(ch);
+          busy.delete(id);
         }
         continue;
       }
@@ -132,41 +157,49 @@ export class Generator extends EventTarget {
 
   async narrateChapter(ch, signal) {
     const book = this.book;
-    const chapter = book.chapters[ch];
-    const style = STYLES.find((s) => s.id === book.style) || STYLES[0];
-    for (let k = 0; k < chapter.chunks.length; k++) {
+    const n = book.chapters[ch].chunks.length;
+    for (let k = 0; k < n; k++) {
       if (signal.aborted || this.blocked || book !== this.book) return;
       if (this.done.has(`${ch}|${k}`)) continue;
-      const chunk = chapter.chunks[k];
-      const prev = chapter.chunks[k - 1];
-      const next = chapter.chunks[k + 1];
-      const recentIds = [];
-      for (let j = Math.max(0, k - 3); j < k; j++) {
-        const r = this.ids.get(`${ch}|${j}`);
-        if (r && Date.now() - r.at < STITCH_WINDOW_MS) recentIds.push(r.id);
-      }
-      const params = {
-        provider: book.provider,
-        voice: book.voice,
-        model: book.model,
-        format: book.quality,
-        text: chunk.text,
-        previousText: prev ? prev.text.slice(-800) : "",
-        nextText: next ? next.text.slice(0, 400) : "",
-        previousRequestIds: recentIds.length === Math.min(3, k) ? recentIds : [],
-        instructions: style.direction,
-        stability: style.stability,
-        styleExaggeration: style.exaggeration,
-        similarity: 0.8,
-      };
-      const out = await this.synthWithRetry(params, signal);
-      if (!out) return;
-      const prepared = await prepareChunk(out.data, out.type, chunk.pause);
-      await db.putAudio(book.id, ch, k, { blob: prepared.blob, duration: prepared.duration, requestId: out.requestId, at: Date.now() });
-      if (out.requestId) this.ids.set(`${ch}|${k}`, { id: out.requestId, at: Date.now() });
-      this.done.set(`${ch}|${k}`, prepared.duration);
-      this.emit("chunk", { ch, k, duration: prepared.duration });
+      if (!(await this.narrateChunk(ch, k, signal))) return;
     }
+  }
+
+  // Narrate one passage. Returns false if the run was stopped or blocked.
+  async narrateChunk(ch, k, signal) {
+    const book = this.book;
+    const chapter = book.chapters[ch];
+    const style = STYLES.find((s) => s.id === book.style) || STYLES[0];
+    const chunk = chapter.chunks[k];
+    const prev = chapter.chunks[k - 1];
+    const next = chapter.chunks[k + 1];
+    const recentIds = [];
+    for (let j = Math.max(0, k - 3); j < k; j++) {
+      const r = this.ids.get(`${ch}|${j}`);
+      if (r && Date.now() - r.at < STITCH_WINDOW_MS) recentIds.push(r.id);
+    }
+    const params = {
+      provider: book.provider,
+      voice: book.voice,
+      model: book.model,
+      format: book.quality,
+      text: chunk.text,
+      previousText: prev ? prev.text.slice(-800) : "",
+      nextText: next ? next.text.slice(0, 400) : "",
+      previousRequestIds: this.stitched() && recentIds.length === Math.min(3, k) ? recentIds : [],
+      instructions: style.direction,
+      stability: style.stability,
+      styleExaggeration: style.exaggeration,
+      similarity: 0.8,
+    };
+    const out = await this.synthWithRetry(params, signal);
+    if (!out || book !== this.book) return false;
+    const prepared = await prepareChunk(out.data, out.type, chunk.pause);
+    await db.putAudio(book.id, ch, k, { blob: prepared.blob, duration: prepared.duration, requestId: out.requestId, at: Date.now() });
+    if (out.requestId) this.ids.set(`${ch}|${k}`, { id: out.requestId, at: Date.now() });
+    this.done.set(`${ch}|${k}`, prepared.duration);
+    this.emit("chunk", { ch, k, duration: prepared.duration });
+    return true;
   }
 
   async synthWithRetry(params, signal) {
