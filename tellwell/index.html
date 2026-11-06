@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Tellwell</title>
+    <meta name="description" content="Turn any PDF into a naturally narrated audiobook and listen right here." />
+    <meta name="theme-color" content="#16120f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f0e6" media="(prefers-color-scheme: light)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Tellwell" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-180.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#/" aria-label="Tellwell library">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 7.5c3.6-1.4 7.1-1.2 10 1v17c-2.9-2.2-6.4-2.4-10-1z M26 7.5c-3.6-1.4-7.1-1.2-10 1v17c2.9-2.2 6.4-2.4 10-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <span>Tellwell</span>
+      </a>
+      <button class="icon-btn" id="settingsBtn" aria-label="Settings"></button>
+    </header>
+
+    <main id="view" tabindex="-1"></main>
+
+    <div id="mini" class="mini" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <dialog id="sheet" class="sheet"></dialog>
+
+    <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden />
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
